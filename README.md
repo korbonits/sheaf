@@ -28,56 +28,27 @@ pip install "sheaf-serve[all]"                 # everything
 ## Quickstart
 
 ```python
-from sheaf import ModelServer, ModelSpec
-from sheaf.api.base import ModelType
-from sheaf.scheduling import BatchPolicy
-from sheaf.spec import ResourceConfig
-
-chronos_spec = ModelSpec(
-    name="chronos2-small",
-    model_type=ModelType.TIME_SERIES,
-    backend="chronos2",
-    backend_kwargs={"model_id": "amazon/chronos-bolt-small"},
-    resources=ResourceConfig(num_gpus=1, replicas=2),
-    batch_policy=BatchPolicy(max_batch_size=64, bucket_by="horizon"),
-)
-
-server = ModelServer(models=[chronos_spec])
-server.run()
-```
-
-Then send a forecast request:
-
-```python
-import requests
 from sheaf.api.time_series import Frequency, OutputMode, TimeSeriesRequest
+from sheaf.backends.chronos import Chronos2Backend
+
+backend = Chronos2Backend(model_id="amazon/chronos-bolt-tiny", device_map="cpu")
+backend.load()
 
 req = TimeSeriesRequest(
-    model_name="chronos2-small",
-    history=[1.2, 1.5, 1.3, 1.8, 2.1, 2.4, 2.2, 2.7],
-    horizon=24,
+    model_name="chronos-bolt-tiny",
+    history=[312, 298, 275, 260, 255, 263, 285, 320,
+             368, 402, 421, 435, 442, 438, 430, 425],
+    horizon=12,
     frequency=Frequency.HOURLY,
     output_mode=OutputMode.QUANTILES,
+    quantile_levels=[0.1, 0.5, 0.9],
 )
 
-response = requests.post(
-    "http://localhost:8000/chronos2-small",
-    json=req.model_dump(mode="json"),
-)
-print(response.json())
-# {"mean": [...], "quantiles": {"0.1": [...], "0.5": [...], "0.9": [...]}, ...}
+response = backend.predict(req)
+# response.mean, response.quantiles
 ```
 
-Or resolve features directly from Feast:
-
-```python
-req = TimeSeriesRequest(
-    model_name="chronos2-small",
-    feature_ref={"feature_view": "asset_prices", "entity_id": "AAPL"},
-    horizon=24,
-    frequency=Frequency.HOURLY,
-)
-```
+See [`examples/`](examples/) for time series comparison (Chronos vs TimesFM) and tabular classification/regression.
 
 ---
 
@@ -86,13 +57,35 @@ req = TimeSeriesRequest(
 | Type | Status | Backends |
 |---|---|---|
 | Time series | ✅ v0.1 | Chronos, Chronos-Bolt, TimesFM |
-| Tabular | 🔜 v0.2 | TabPFN |
-| Molecular / biological | 🔜 v0.2 | ESM-3, AlphaFold |
+| Tabular | ✅ v0.1 | TabPFN |
+| Molecular / biological | 🔜 v0.3 | ESM-3, AlphaFold |
 | Audio | 🔜 v0.3 | Whisper, MusicGen |
 | Embeddings | 🔜 v0.3 | CLIP, ColBERT |
 | Geospatial / Earth science | 🔜 v0.3 | GraphCast, Clay |
 | Diffusion | 🔜 v0.4 | Flux, Stable Diffusion |
 | Neural operators | 🔜 v0.4 | FNO, DeepONet |
+
+## Roadmap to production
+
+v0.1 is a library you call from Python. The following are required before Sheaf is production-usable:
+
+**v0.2 — serving layer**
+- [ ] Ray Serve integration tested end-to-end
+- [ ] Async `predict()` handlers
+- [ ] HTTP API with proper request validation (422 on bad input)
+- [ ] Health check and readiness probe endpoints
+- [ ] Basic error handling at the service boundary
+
+**v0.2 — reliability**
+- [ ] Batching scheduler (BatchPolicy currently defined but not enforced)
+- [ ] Model hot-swap without restart
+- [ ] Container-friendly auth for TabPFN v2 (TABPFN_TOKEN env var works, but first-run browser flow breaks in headless environments)
+
+**v0.3 — model types**
+- [ ] ESM-3 / molecular backend
+- [ ] Audio backend (Whisper)
+- [ ] Geospatial backend (GraphCast)
+- [ ] Feast feature resolver implemented end-to-end
 
 ---
 
