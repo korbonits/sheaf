@@ -161,3 +161,28 @@ def test_any_request_rejects_invalid_time_series_body() -> None:
                 # missing horizon and frequency
             }
         )
+
+
+# ---------------------------------------------------------------------------
+# Registry auto-import fix
+# ---------------------------------------------------------------------------
+
+
+def test_standard_backends_registered_after_server_import() -> None:
+    """Importing sheaf.server must register all standard backends.
+
+    This directly tests the auto-import fix: Ray worker processes import
+    server.py on startup, so @register_backend must have run for each
+    standard backend by the time any deployment __init__ is called.
+    """
+    from sheaf.registry import _BACKEND_REGISTRY
+
+    assert "chronos2" in _BACKEND_REGISTRY, (
+        "chronos2 not in registry — sheaf.backends.chronos was not auto-imported"
+    )
+    assert "tabpfn" in _BACKEND_REGISTRY, (
+        "tabpfn not in registry — sheaf.backends.tabpfn was not auto-imported"
+    )
+    assert "timesfm" in _BACKEND_REGISTRY, (
+        "timesfm not in registry — sheaf.backends.timesfm was not auto-imported"
+    )

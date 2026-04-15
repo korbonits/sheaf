@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib
+import os
 from typing import Annotated, Any, cast
 
 import ray
@@ -22,6 +24,13 @@ from sheaf.backends.base import ModelBackend
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
 from sheaf.spec import ModelSpec
 
+# Allow extra backend modules to be registered at worker startup via an env var.
+# Useful for custom backends and testing:
+#   SHEAF_EXTRA_BACKENDS=mypackage.backends,tests.stubs
+for _mod in os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):
+    if _mod.strip():
+        importlib.import_module(_mod.strip())
+
 # Discriminated union of all supported request types.
 # FastAPI uses the `model_type` field to select the right Pydantic model
 # and return 422 if the body doesn't match any variant.
@@ -37,11 +46,38 @@ _app = FastAPI(title="Sheaf")
 @serve.ingress(_app)
 class _SheafDeployment:
     def __init__(self, spec: ModelSpec) -> None:
-        backend_cls = spec.backend_cls or _BACKEND_REGISTRY.get(spec.backend)
+        # Ray Serve may cloudpickle this class by value (inline), causing two
+        # problems in the worker process:
+        #
+        #   1. sheaf.server is never imported → module-level SHEAF_EXTRA_BACKENDS
+        #      loop never runs.
+        #   2. The captured _BACKEND_REGISTRY reference is a snapshot dict from
+        #      the driver process, not the live worker registry.
+        #
+        # Additionally, even when the class IS imported by module reference,
+        # the module-level loop runs before runtime_env.env_vars are applied,
+        # so SHEAF_EXTRA_BACKENDS is still empty at that point.
+        #
+        # Fix: re-import standard backends (idempotent), run the extra-backends
+        # loop here (guaranteed to see runtime_env env_vars), then look up from
+        # the freshly-populated worker registry.
+        import sheaf.backends.chronos  # noqa: F401
+        import sheaf.backends.tabpfn  # noqa: F401
+        import sheaf.backends.timesfm  # noqa: F401
+
+        for _mod in os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):
+            if _mod.strip():
+                importlib.import_module(_mod.strip())
+
+        # Import the live registry — not the module-level binding which may be
+        # a stale cloudpickle snapshot.
+        from sheaf.registry import _BACKEND_REGISTRY as _registry
+
+        backend_cls = spec.backend_cls or _registry.get(spec.backend)
         if backend_cls is None:
             raise ValueError(
                 f"Unknown backend '{spec.backend}'. "
-                f"Registered backends: {list(_BACKEND_REGISTRY)}"
+                f"Registered backends: {list(_registry)}"
             )
         self._backend: ModelBackend = backend_cls(**spec.backend_kwargs)
         self._backend.load()
