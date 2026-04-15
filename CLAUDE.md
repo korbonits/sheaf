@@ -100,6 +100,7 @@ Reference implementation: `src/sheaf/backends/chronos.py` + `src/sheaf/api/time_
 git clone https://github.com/korbonits/sheaf.git
 cd sheaf
 uv sync --extra dev
+uv run pre-commit install   # required once per clone — hooks mirror CI checks
 uv run pytest tests/
 ```
 
