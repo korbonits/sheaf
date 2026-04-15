@@ -23,7 +23,6 @@ Each new model type needs:
 The time series contract (`src/sheaf/api/time_series.py`) and Chronos2 backend (`src/sheaf/backends/chronos.py`) are the reference implementation. Follow that pattern.
 
 **Wanted backends (in priority order):**
-- TabPFN (`tabular`)
 - TimesFM (`time_series`)
 - ESM-3 (`molecular`)
 - Whisper (`audio`)

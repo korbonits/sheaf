@@ -3923,7 +3923,7 @@ all = [
     { name = "feast" },
     { name = "pymilvus" },
     { name = "tabpfn" },
-    { name = "timesfm" },
+    { name = "timesfm", extra = ["torch"] },
 ]
 dev = [
     { name = "mypy" },
@@ -3946,7 +3946,7 @@ tabular = [
 ]
 time-series = [
     { name = "chronos-forecasting" },
-    { name = "timesfm" },
+    { name = "timesfm", extra = ["torch"] },
 ]
 
 [package.metadata]
@@ -3965,7 +3965,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
     { name = "sheaf-serve", extras = ["time-series", "tabular", "molecular", "feast", "milvus"], marker = "extra == 'all'" },
     { name = "tabpfn", marker = "extra == 'tabular'", specifier = ">=2.0.0" },
-    { name = "timesfm", marker = "extra == 'time-series'", specifier = ">=1.0.0" },
+    { name = "timesfm", extras = ["torch"], marker = "extra == 'time-series'", specifier = ">=1.0.0" },
 ]
 provides-extras = ["time-series", "tabular", "molecular", "feast", "milvus", "dev", "all"]
 
@@ -4196,6 +4196,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/1d/38/b98e0e45408348ef91ba8b3035db247200d3ad8a8c8eaf62a82f2add7cf8/timesfm-1.3.0.tar.gz", hash = "sha256:c494775c17d373d8d7f2e5562468fdff371c123d1d6e43dcfe92fbf9a86fec4e", size = 48227, upload-time = "2025-07-06T22:07:07.839Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d9/04/afb1888ab8db240576811b240cc7b7687c348516a72bfd618c5bd98ea9d2/timesfm-1.3.0-py3-none-any.whl", hash = "sha256:a99e22b13654bdbfaecb14a48e4a8dc6c990b191a0322a5cacd09eb0df3bfebe", size = 55019, upload-time = "2025-07-06T22:07:06.366Z" },
+]
+
+[package.optional-dependencies]
+torch = [
+    { name = "torch", marker = "python_full_version == '3.11.*'" },
 ]
 
 [[package]]

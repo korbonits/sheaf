@@ -30,7 +30,7 @@ dependencies = [
 [project.optional-dependencies]
 time-series = [
     "chronos-forecasting>=1.0.0",
-    "timesfm>=1.0.0",
+    "timesfm[torch]>=1.0.0",
 ]
 tabular = [
     "tabpfn>=2.0.0",
