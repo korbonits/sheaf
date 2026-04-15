@@ -113,7 +113,7 @@ def urls():
             ray.shutdown()
             pytest.fail(f"{label} did not become ready within 30s")
 
-    yield {"cls": base_cls, "registry": base_reg, "error": base_err}
+    yield {"cls": base_cls, "registry": base_reg, "error": base_err, "server": server}
 
     server.shutdown()
     ray.shutdown()
@@ -133,6 +133,11 @@ def registry_serving_url(urls: dict) -> str:
 @pytest.fixture(scope="module")
 def error_serving_url(urls: dict) -> str:
     return urls["error"]
+
+
+@pytest.fixture(scope="module")
+def model_server(urls: dict):  # type: ignore[type-arg]
+    return urls["server"]
 
 
 # ---------------------------------------------------------------------------
@@ -279,3 +284,54 @@ def test_backend_error_returns_500(error_serving_url: str) -> None:
     detail = r.json()["detail"]
     assert "RuntimeError" in detail
     assert "backend exploded" in detail
+
+
+def test_hot_swap(serving_url: str, model_server) -> None:  # type: ignore[type-arg]
+    """server.update() replaces a deployment in place with no URL change.
+
+    This test mutates smoke-ts and must run last in the module.
+
+    Flow:
+      1. Verify smoke-ts currently returns mean=[0.42, 0.42]
+      2. Call server.update() with a spec pointing to the 0.99 backend
+      3. Poll until predictions return 0.99 (rolling update complete)
+    """
+    from tests.stubs import SmokeTimeSeriesRegistryBackend
+
+    payload = {
+        "model_type": "time_series",
+        "model_name": "smoke-ts",
+        "history": [1.0, 2.0],
+        "horizon": 2,
+        "frequency": "1h",
+    }
+
+    # Confirm baseline before swap
+    r = requests.post(f"{serving_url}/predict", json=payload)
+    assert r.status_code == 200
+    assert r.json()["mean"] == [0.42, 0.42]
+
+    # Swap to a backend that returns 0.99
+    new_spec = ModelSpec(
+        name="smoke-ts",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_ts_registry",
+        backend_cls=SmokeTimeSeriesRegistryBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
+    model_server.update(new_spec)
+
+    # Poll until the new backend is serving (rolling update may take a moment)
+    deadline = time.time() + 30
+    last_response = None
+    while time.time() < deadline:
+        r = requests.post(f"{serving_url}/predict", json=payload)
+        if r.status_code == 200 and r.json().get("mean") == [0.99, 0.99]:
+            last_response = r
+            break
+        time.sleep(0.5)
+    else:
+        pytest.fail("Hot-swap did not complete within 30s")
+
+    assert last_response is not None
+    assert last_response.json()["mean"] == [0.99, 0.99]

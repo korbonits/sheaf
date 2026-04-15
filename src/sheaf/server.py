@@ -179,6 +179,22 @@ class ModelServer:
         self._port = port
         self._deployments: dict[str, Any] = {}
 
+    def _deploy(self, spec: ModelSpec) -> Any:
+        """Build and deploy a _SheafDeployment for spec. Returns the handle."""
+        deployment = (
+            cast(Any, _SheafDeployment)
+            .options(
+                name=spec.name,
+                num_replicas=spec.resources.replicas,
+                ray_actor_options={
+                    "num_cpus": spec.resources.num_cpus,
+                    "num_gpus": spec.resources.num_gpus,
+                },
+            )
+            .bind(spec)
+        )
+        return serve.run(deployment, name=spec.name, route_prefix=f"/{spec.name}")
+
     def run(self) -> None:
         if not ray.is_initialized():
             ray.init()
@@ -186,20 +202,36 @@ class ModelServer:
         serve.start(http_options={"host": self._host, "port": self._port})
 
         for spec in self._models:
-            deployment = (
-                cast(Any, _SheafDeployment)
-                .options(
-                    name=spec.name,
-                    num_replicas=spec.resources.replicas,
-                    ray_actor_options={
-                        "num_cpus": spec.resources.num_cpus,
-                        "num_gpus": spec.resources.num_gpus,
-                    },
-                )
-                .bind(spec)
+            self._deployments[spec.name] = self._deploy(spec)
+
+    def update(self, spec: ModelSpec) -> None:
+        """Hot-swap a running deployment with a new ModelSpec.
+
+        Ray Serve performs a rolling update: new replicas start with the new
+        spec while old replicas finish in-flight requests. The route prefix
+        and deployment name are preserved, so clients see no URL change and
+        no requests are dropped.
+
+        The deployment must already be running (spec.name was passed to run()).
+        To add a brand-new deployment, call run() again with an updated models
+        list instead.
+
+        Example:
+            server.update(ModelSpec(
+                name="chronos-small",          # same name — replaces in place
+                backend="chronos2",
+                backend_kwargs={"model_size": "large"},  # new weights
+                resources=ResourceConfig(num_gpus=1),
+            ))
+        """
+        if spec.name not in self._deployments:
+            raise ValueError(
+                f"No deployment named '{spec.name}'. "
+                f"Running deployments: {list(self._deployments)}"
             )
-            handle = serve.run(deployment, name=spec.name, route_prefix=f"/{spec.name}")
-            self._deployments[spec.name] = handle
+        self._deployments[spec.name] = self._deploy(spec)
+        # Keep self._models in sync so repeated calls to run() are consistent.
+        self._models = [s if s.name != spec.name else spec for s in self._models]
 
     def shutdown(self) -> None:
         serve.shutdown()
