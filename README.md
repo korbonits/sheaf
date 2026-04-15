@@ -67,17 +67,13 @@ See [`examples/`](examples/) for time series comparison (Chronos vs TimesFM) and
 
 ## Roadmap to production
 
-v0.1 is a library you call from Python. The following are required before Sheaf is production-usable:
-
 **v0.2 — serving layer**
-- [ ] Ray Serve integration tested end-to-end
-- [ ] Async `predict()` handlers
-- [ ] HTTP API with proper request validation (422 on bad input)
-- [ ] Health check and readiness probe endpoints
+- [x] Ray Serve integration tested end-to-end
+- [x] Async `predict()` handlers
+- [x] HTTP API with proper request validation (422 on bad input)
+- [x] Health check and readiness probe endpoints
+- [x] Batching scheduler (BatchPolicy wired into `@serve.batch` per deployment)
 - [ ] Basic error handling at the service boundary
-
-**v0.2 — reliability**
-- [ ] Batching scheduler (BatchPolicy currently defined but not enforced)
 - [ ] Model hot-swap without restart
 - [ ] Container-friendly auth for TabPFN v2 (TABPFN_TOKEN env var works, but first-run browser flow breaks in headless environments)
 
