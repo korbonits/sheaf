@@ -58,3 +58,18 @@ class SmokeTimeSeriesRegistryBackend(ModelBackend):
             frequency=request.frequency.value,
             mean=[0.99] * request.horizon,
         )
+
+
+@register_backend("_smoke_error")
+class ErrorTimeSeriesBackend(ModelBackend):
+    """Backend that always raises — used to test service-boundary error handling."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.TIME_SERIES
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        raise RuntimeError("backend exploded")

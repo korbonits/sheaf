@@ -20,7 +20,7 @@ import requests
 
 from sheaf.api.base import ModelType
 from sheaf.spec import ModelSpec, ResourceConfig
-from tests.stubs import SmokeTimeSeriesBackend
+from tests.stubs import ErrorTimeSeriesBackend, SmokeTimeSeriesBackend
 
 # ---------------------------------------------------------------------------
 # Opt-in gate
@@ -78,16 +78,28 @@ def urls():
         backend="_smoke_ts_registry",  # string lookup — no backend_cls
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    err_spec = ModelSpec(
+        name="smoke-error",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_error",
+        backend_cls=ErrorTimeSeriesBackend,  # cloudpickled to worker
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
-        models=[cls_spec, reg_spec], host="127.0.0.1", port=_SMOKE_PORT
+        models=[cls_spec, reg_spec, err_spec], host="127.0.0.1", port=_SMOKE_PORT
     )
     server.run()
 
     base_cls = f"http://127.0.0.1:{_SMOKE_PORT}/smoke-ts"
     base_reg = f"http://127.0.0.1:{_SMOKE_PORT}/smoke-registry"
+    base_err = f"http://127.0.0.1:{_SMOKE_PORT}/smoke-error"
 
-    for label, url in [("smoke-ts", base_cls), ("smoke-registry", base_reg)]:
+    for label, url in [
+        ("smoke-ts", base_cls),
+        ("smoke-registry", base_reg),
+        ("smoke-error", base_err),
+    ]:
         deadline = time.time() + 30
         while time.time() < deadline:
             try:
@@ -101,7 +113,7 @@ def urls():
             ray.shutdown()
             pytest.fail(f"{label} did not become ready within 30s")
 
-    yield {"cls": base_cls, "registry": base_reg}
+    yield {"cls": base_cls, "registry": base_reg, "error": base_err}
 
     server.shutdown()
     ray.shutdown()
@@ -116,6 +128,11 @@ def serving_url(urls: dict) -> str:
 @pytest.fixture(scope="module")
 def registry_serving_url(urls: dict) -> str:
     return urls["registry"]
+
+
+@pytest.fixture(scope="module")
+def error_serving_url(urls: dict) -> str:
+    return urls["error"]
 
 
 # ---------------------------------------------------------------------------
@@ -241,3 +258,24 @@ def test_batch_policy_applied(serving_url: str) -> None:
     means = [m for _, m in results]
     assert all(s == 200 for s in statuses), statuses
     assert all(m == [0.42, 0.42] for m in means), means
+
+
+def test_backend_error_returns_500(error_serving_url: str) -> None:
+    """A backend that raises must return HTTP 500 with a structured detail field.
+
+    Verifies the service boundary error handling: the exception is caught in
+    predict(), logged server-side, and returned as a JSON error response rather
+    than crashing the actor or returning an opaque 500.
+    """
+    payload = {
+        "model_type": "time_series",
+        "model_name": "smoke-error",
+        "history": [1.0, 2.0],
+        "horizon": 2,
+        "frequency": "1h",
+    }
+    r = requests.post(f"{error_serving_url}/predict", json=payload)
+    assert r.status_code == 500
+    detail = r.json()["detail"]
+    assert "RuntimeError" in detail
+    assert "backend exploded" in detail

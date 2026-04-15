@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import os
 from typing import Annotated, Any, cast
 
@@ -40,6 +41,7 @@ AnyRequest = Annotated[
 ]
 
 _app = FastAPI(title="Sheaf")
+_logger = logging.getLogger(__name__)
 
 
 @serve.deployment
@@ -128,7 +130,16 @@ class _SheafDeployment:
                     f"got '{request.model_type}'"
                 ),
             )
-        return await self._batch_predict(request)  # type: ignore[return-value]
+        try:
+            return await self._batch_predict(request)  # type: ignore[return-value]
+        except Exception as exc:
+            # Log the full traceback server-side; expose only type + message
+            # to the client so internal details don't leak.
+            _logger.exception("Inference error in deployment '%s'", self._spec.name)
+            raise HTTPException(
+                status_code=500,
+                detail=f"{type(exc).__name__}: {exc}",
+            ) from exc
 
     @serve.batch(max_batch_size=32, batch_wait_timeout_s=0.05)
     async def _batch_predict(self, requests: list[BaseRequest]) -> list[dict[str, Any]]:
