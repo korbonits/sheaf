@@ -121,9 +121,7 @@ class _SheafDeployment:
         return await self._batch_predict(request)  # type: ignore[return-value]
 
     @serve.batch(max_batch_size=32, batch_wait_timeout_s=0.05)
-    async def _batch_predict(
-        self, requests: list[BaseRequest]
-    ) -> list[dict[str, Any]]:
+    async def _batch_predict(self, requests: list[BaseRequest]) -> list[dict[str, Any]]:
         """Batched inference handler.
 
         Ray Serve accumulates concurrent predict() calls and delivers them
@@ -171,7 +169,8 @@ class ModelServer:
 
         for spec in self._models:
             deployment = (
-                cast(Any, _SheafDeployment).options(
+                cast(Any, _SheafDeployment)
+                .options(
                     name=spec.name,
                     num_replicas=spec.resources.replicas,
                     ray_actor_options={
@@ -181,9 +180,7 @@ class ModelServer:
                 )
                 .bind(spec)
             )
-            handle = serve.run(
-                deployment, name=spec.name, route_prefix=f"/{spec.name}"
-            )
+            handle = serve.run(deployment, name=spec.name, route_prefix=f"/{spec.name}")
             self._deployments[spec.name] = handle
 
     def shutdown(self) -> None:
