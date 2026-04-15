@@ -53,7 +53,7 @@ class TabPFNBackend(ModelBackend):
 
     def load(self) -> None:
         if not os.environ.get("TABPFN_TOKEN"):
-            raise EnvironmentError(
+            raise OSError(
                 "TABPFN_TOKEN is not set. Obtain a token at https://ux.priorlabs.ai "
                 "and set it with: export TABPFN_TOKEN='<your-token>'"
             )

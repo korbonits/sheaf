@@ -1,7 +1,6 @@
 """Abstract base class for model backends."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from sheaf.api.base import BaseRequest, BaseResponse
 

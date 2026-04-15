@@ -1,10 +1,8 @@
 """API contract for time series foundation models (Chronos2, TimesFM, etc.)."""
 
 from enum import Enum
-from typing import Annotated, Any
-from uuid import UUID
+from typing import Annotated
 
-import numpy as np
 from pydantic import Field, model_validator
 
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType

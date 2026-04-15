@@ -11,7 +11,7 @@ Supports two model families with different inference patterns:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 
@@ -19,9 +19,6 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 from sheaf.api.time_series import OutputMode, TimeSeriesRequest, TimeSeriesResponse
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import register_backend
-
-if TYPE_CHECKING:
-    import torch
 
 # Fixed quantile levels output by all official Chronos-Bolt models
 _BOLT_QUANTILE_LEVELS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
@@ -90,7 +87,9 @@ class Chronos2Backend(ModelBackend):
     def batch_predict(self, requests: list[BaseRequest]) -> list[BaseResponse]:
         ts_requests = [r for r in requests if isinstance(r, TimeSeriesRequest)]
         if len(ts_requests) != len(requests):
-            raise TypeError("All requests must be TimeSeriesRequest for Chronos2Backend")
+            raise TypeError(
+                "All requests must be TimeSeriesRequest for Chronos2Backend"
+            )
         return self._run(ts_requests)
 
     def _run(self, requests: list[TimeSeriesRequest]) -> list[TimeSeriesResponse]:

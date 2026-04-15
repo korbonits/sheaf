@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sheaf.backends.base import ModelBackend
 
-_BACKEND_REGISTRY: dict[str, type["ModelBackend"]] = {}
+_BACKEND_REGISTRY: dict[str, type[ModelBackend]] = {}
 
 
 def register_backend(name: str):
@@ -18,7 +18,7 @@ def register_backend(name: str):
         class Chronos2Backend(ModelBackend):
             ...
     """
-    def decorator(cls: type["ModelBackend"]) -> type["ModelBackend"]:
+    def decorator(cls: type[ModelBackend]) -> type[ModelBackend]:
         _BACKEND_REGISTRY[name] = cls
         return cls
     return decorator

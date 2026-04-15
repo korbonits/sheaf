@@ -6,7 +6,7 @@ Model: google/timesfm-1.0-200m-pytorch (CPU-compatible, ~200M params)
 Key differences from Chronos-Bolt:
 - horizon_len is fixed at load time; longer requests are truncated
 - quantiles are always computed at all 9 levels (0.1..0.9); we select at response time
-- freq is an integer: 0=high (hourly/daily), 1=medium (weekly/monthly), 2=low (quarterly/yearly)
+- freq is an integer: 0=high (hourly/daily), 1=medium (weekly/monthly), 2=low
 """
 
 from __future__ import annotations
@@ -16,7 +16,12 @@ from typing import Any
 import numpy as np
 
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
-from sheaf.api.time_series import Frequency, OutputMode, TimeSeriesRequest, TimeSeriesResponse
+from sheaf.api.time_series import (
+    Frequency,
+    OutputMode,
+    TimeSeriesRequest,
+    TimeSeriesResponse,
+)
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import register_backend
 
@@ -45,8 +50,8 @@ class TimesFMBackend(ModelBackend):
     Args:
         model_id: HuggingFace model ID. Use "google/timesfm-1.0-200m-pytorch" for CPU.
         backend: "cpu", "gpu", or "tpu"
-        horizon_len: Max forecast horizon. Must match checkpoint architecture (default 128).
-                     Requests with horizon > horizon_len will raise an error.
+        horizon_len: Max forecast horizon. Must match checkpoint architecture
+                     (default 128). Raises if request horizon exceeds this.
         per_core_batch_size: Batch size per device.
     """
 
@@ -143,7 +148,7 @@ class TimesFMBackend(ModelBackend):
                     quantiles[str(q)] = quantile_preds[:h, idx].tolist()
                 else:
                     # Interpolate between nearest available quantiles
-                    lower = max(l for l in _TIMESFM_QUANTILE_LEVELS if l <= q)
+                    lower = max(lv for lv in _TIMESFM_QUANTILE_LEVELS if lv <= q)
                     upper = min(u for u in _TIMESFM_QUANTILE_LEVELS if u >= q)
                     lo_idx = _TIMESFM_QUANTILE_LEVELS.index(lower)
                     hi_idx = _TIMESFM_QUANTILE_LEVELS.index(upper)
