@@ -58,7 +58,10 @@ class TabPFNBackend(ModelBackend):
                 "and set it with: export TABPFN_TOKEN='<your-token>'"
             )
         try:
-            from tabpfn import TabPFNClassifier, TabPFNRegressor  # ty: ignore[unresolved-import]
+            from tabpfn import (  # ty: ignore[unresolved-import]
+                TabPFNClassifier,
+                TabPFNRegressor,
+            )
         except ImportError as e:
             raise ImportError(
                 "tabpfn is required for the TabPFN backend. "

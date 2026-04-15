@@ -58,7 +58,10 @@ class Chronos2Backend(ModelBackend):
     def load(self) -> None:
         try:
             import torch  # ty: ignore[unresolved-import]
-            from chronos import BaseChronosPipeline, ChronosBoltPipeline  # ty: ignore[unresolved-import]
+            from chronos import (  # ty: ignore[unresolved-import]
+                BaseChronosPipeline,
+                ChronosBoltPipeline,
+            )
         except ImportError as e:
             raise ImportError(
                 "chronos-forecasting is required for the Chronos2 backend. "
