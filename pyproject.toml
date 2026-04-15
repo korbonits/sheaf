@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sheaf-serve"
+version = "0.1.0"
+description = "Unified serving layer for non-text foundation models"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Alex Korbonits", email = "alexkorbonits@gmail.com" }]
+keywords = ["serving", "inference", "foundation-models", "ray", "mlops"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "ray[serve]>=2.10.0",
+    "pydantic>=2.0.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+time-series = [
+    "chronos-forecasting>=1.0.0",
+    "timesfm>=1.0.0",
+]
+tabular = [
+    "tabpfn>=2.0.0",
+]
+molecular = [
+    "fair-esm>=2.0.0",
+]
+feast = [
+    "feast>=0.40.0",
+]
+milvus = [
+    "pymilvus>=2.4.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.9.0",
+    "pre-commit>=3.7.0",
+]
+all = [
+    "sheaf-serve[time-series,tabular,molecular,feast,milvus]",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sheaf"]
+
+[tool.ruff]
+line-length = 88
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src/sheaf"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
