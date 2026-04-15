@@ -9,6 +9,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import Field
 from ray import serve
 
+# Auto-import standard backends so they self-register via @register_backend.
+# These are side-effect-only imports; heavy deps (torch, etc.) are lazy inside load().
+# This ensures the registry is populated in Ray Serve worker processes.
+import sheaf.backends.chronos  # noqa: F401
+import sheaf.backends.tabpfn  # noqa: F401
+import sheaf.backends.timesfm  # noqa: F401
 from sheaf.api.base import BaseRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
@@ -31,7 +37,7 @@ _app = FastAPI(title="Sheaf")
 @serve.ingress(_app)
 class _SheafDeployment:
     def __init__(self, spec: ModelSpec) -> None:
-        backend_cls = _BACKEND_REGISTRY.get(spec.backend)
+        backend_cls = spec.backend_cls or _BACKEND_REGISTRY.get(spec.backend)
         if backend_cls is None:
             raise ValueError(
                 f"Unknown backend '{spec.backend}'. "
