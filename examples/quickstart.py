@@ -26,9 +26,30 @@ print("Ready.\n")
 
 # Hourly electricity demand (kWh), last 24 hours
 history = [
-    312, 298, 275, 260, 255, 263, 285, 320,
-    368, 402, 421, 435, 442, 438, 430, 425,
-    418, 410, 398, 385, 372, 358, 342, 328,
+    312,
+    298,
+    275,
+    260,
+    255,
+    263,
+    285,
+    320,
+    368,
+    402,
+    421,
+    435,
+    442,
+    438,
+    430,
+    425,
+    418,
+    410,
+    398,
+    385,
+    372,
+    358,
+    342,
+    328,
 ]
 
 req = TimeSeriesRequest(
@@ -55,7 +76,7 @@ p50 = response.quantiles["0.5"]
 p90 = response.quantiles["0.9"]
 
 for i in range(response.horizon):
-    print(f"{i+1:>5}  {p10[i]:>7.1f}  {p50[i]:>7.1f}  {p90[i]:>7.1f}")
+    print(f"{i + 1:>5}  {p10[i]:>7.1f}  {p50[i]:>7.1f}  {p90[i]:>7.1f}")
 
 # --- 5. Batch prediction ---
 
@@ -81,4 +102,4 @@ requests = [
 responses = backend.batch_predict(requests)
 
 for i, resp in enumerate(responses):
-    print(f"Series {i+1}: {[round(x, 1) for x in resp.mean]}")
+    print(f"Series {i + 1}: {[round(x, 1) for x in resp.mean]}")

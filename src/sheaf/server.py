@@ -1,6 +1,6 @@
 """ModelServer — the Ray Serve entry point for Sheaf."""
 
-from typing import Any
+from typing import Any, cast
 
 import ray
 from ray import serve
@@ -56,14 +56,19 @@ class ModelServer:
         serve.start(http_options={"host": self._host, "port": self._port})
 
         for spec in self._models:
-            deployment = _SheafDeployment.options(
-                name=spec.name,
-                num_replicas=spec.resources.replicas,
-                ray_actor_options={
-                    "num_cpus": spec.resources.num_cpus,
-                    "num_gpus": spec.resources.num_gpus,
-                },
-            ).bind(spec)
+            # Ray Serve adds .options() dynamically via @serve.deployment decorator
+            deployment = (
+                cast(Any, _SheafDeployment)
+                .options(
+                    name=spec.name,
+                    num_replicas=spec.resources.replicas,
+                    ray_actor_options={
+                        "num_cpus": spec.resources.num_cpus,
+                        "num_gpus": spec.resources.num_gpus,
+                    },
+                )
+                .bind(spec)
+            )
             handle = serve.run(deployment, name=spec.name, route_prefix=f"/{spec.name}")
             self._deployments[spec.name] = handle
 

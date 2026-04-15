@@ -11,7 +11,7 @@ Key differences from Chronos-Bolt:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -58,7 +58,7 @@ class TimesFMBackend(ModelBackend):
     def __init__(
         self,
         model_id: str = "google/timesfm-1.0-200m-pytorch",
-        backend: str = "cpu",
+        backend: Literal["cpu", "gpu", "tpu"] = "cpu",
         horizon_len: int = 128,
         per_core_batch_size: int = 32,
     ) -> None:
@@ -102,7 +102,7 @@ class TimesFMBackend(ModelBackend):
         ts_requests = [r for r in requests if isinstance(r, TimeSeriesRequest)]
         if len(ts_requests) != len(requests):
             raise TypeError("All requests must be TimeSeriesRequest for TimesFMBackend")
-        return self._run(ts_requests)
+        return cast("list[BaseResponse]", self._run(ts_requests))
 
     def _run(self, requests: list[TimeSeriesRequest]) -> list[TimeSeriesResponse]:
         if self._model is None:
@@ -153,10 +153,9 @@ class TimesFMBackend(ModelBackend):
                     lo_idx = _TIMESFM_QUANTILE_LEVELS.index(lower)
                     hi_idx = _TIMESFM_QUANTILE_LEVELS.index(upper)
                     weight = (q - lower) / (upper - lower) if upper != lower else 0.0
-                    interp = (
-                        (1 - weight) * quantile_preds[:h, lo_idx]
-                        + weight * quantile_preds[:h, hi_idx]
-                    )
+                    interp = (1 - weight) * quantile_preds[
+                        :h, lo_idx
+                    ] + weight * quantile_preds[:h, hi_idx]
                     quantiles[str(q)] = interp.tolist()
 
         return TimeSeriesResponse(

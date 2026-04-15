@@ -11,7 +11,7 @@ Supports two model families with different inference patterns:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -90,7 +90,7 @@ class Chronos2Backend(ModelBackend):
             raise TypeError(
                 "All requests must be TimeSeriesRequest for Chronos2Backend"
             )
-        return self._run(ts_requests)
+        return cast("list[BaseResponse]", self._run(ts_requests))
 
     def _run(self, requests: list[TimeSeriesRequest]) -> list[TimeSeriesResponse]:
         import torch
@@ -100,8 +100,7 @@ class Chronos2Backend(ModelBackend):
 
         # Build context — list of tensors (handles variable-length history)
         contexts = [
-            torch.tensor(r.history or [], dtype=torch.float32)
-            for r in requests
+            torch.tensor(r.history or [], dtype=torch.float32) for r in requests
         ]
         horizon = requests[0].horizon
 

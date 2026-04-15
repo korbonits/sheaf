@@ -25,9 +25,15 @@ print("=== Classification ===\n")
 
 # Iris-like: predict species from petal/sepal measurements
 context_X = [
-    [5.1, 3.5, 1.4, 0.2], [4.9, 3.0, 1.4, 0.2], [6.3, 3.3, 4.7, 1.6],
-    [5.8, 2.7, 4.1, 1.0], [7.1, 3.0, 5.9, 2.1], [6.3, 2.9, 5.6, 1.8],
-    [5.0, 3.6, 1.4, 0.2], [5.5, 2.3, 4.0, 1.3], [6.5, 3.0, 5.8, 2.2],
+    [5.1, 3.5, 1.4, 0.2],
+    [4.9, 3.0, 1.4, 0.2],
+    [6.3, 3.3, 4.7, 1.6],
+    [5.8, 2.7, 4.1, 1.0],
+    [7.1, 3.0, 5.9, 2.1],
+    [6.3, 2.9, 5.6, 1.8],
+    [5.0, 3.6, 1.4, 0.2],
+    [5.5, 2.3, 4.0, 1.3],
+    [6.5, 3.0, 5.8, 2.2],
 ]
 context_y = [0, 0, 1, 1, 2, 2, 0, 1, 2]
 
@@ -50,11 +56,15 @@ req = TabularRequest(
 resp = backend.predict(req)
 
 species = {0: "setosa", 1: "versicolor", 2: "virginica"}
-print(f"{'Query':>5}  {'Prediction':>12}  {'P(setosa)':>10}  {'P(versicolor)':>14}  {'P(virginica)':>13}")
+header = (
+    f"{'Query':>5}  {'Prediction':>12}  "
+    f"{'P(setosa)':>10}  {'P(versicolor)':>14}  {'P(virginica)':>13}"
+)
+print(header)
 print("-" * 65)
 for i, (pred, proba) in enumerate(zip(resp.predictions, resp.probabilities)):
     print(
-        f"{i+1:>5}  {species[pred]:>12}  "
+        f"{i + 1:>5}  {species[pred]:>12}  "
         f"{proba[0]:>10.3f}  {proba[1]:>14.3f}  {proba[2]:>13.3f}"
     )
 

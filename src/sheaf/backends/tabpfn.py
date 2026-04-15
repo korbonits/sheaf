@@ -141,11 +141,13 @@ class TabPFNBackend(ModelBackend):
 
         quantiles = None
         if request.output_mode == "quantiles":
-            q_preds = np.array(reg.predict(
-                X_query,
-                output_type="quantiles",
-                quantiles=request.quantile_levels,
-            ))
+            q_preds = np.array(
+                reg.predict(
+                    X_query,
+                    output_type="quantiles",
+                    quantiles=request.quantile_levels,
+                )
+            )
             # q_preds shape: [n_quantiles, n_query]
             quantiles = {
                 str(q): q_preds[i].tolist()

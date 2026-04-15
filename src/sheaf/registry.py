@@ -18,7 +18,9 @@ def register_backend(name: str):
         class Chronos2Backend(ModelBackend):
             ...
     """
+
     def decorator(cls: type[ModelBackend]) -> type[ModelBackend]:
         _BACKEND_REGISTRY[name] = cls
         return cls
+
     return decorator

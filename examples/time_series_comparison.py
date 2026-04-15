@@ -13,9 +13,30 @@ from sheaf.backends.timesfm import TimesFMBackend
 
 # Hourly electricity demand (kWh), last 24 hours
 history = [
-    312, 298, 275, 260, 255, 263, 285, 320,
-    368, 402, 421, 435, 442, 438, 430, 425,
-    418, 410, 398, 385, 372, 358, 342, 328,
+    312,
+    298,
+    275,
+    260,
+    255,
+    263,
+    285,
+    320,
+    368,
+    402,
+    421,
+    435,
+    442,
+    438,
+    430,
+    425,
+    418,
+    410,
+    398,
+    385,
+    372,
+    358,
+    342,
+    328,
 ]
 
 req = TimeSeriesRequest(
@@ -44,8 +65,10 @@ timesfm_resp = timesfm.predict(req)
 
 # --- Print side-by-side ---
 
-print(f"{'Hour':>5}  {'Chronos P10':>12}  {'Chronos P50':>12}  {'Chronos P90':>12}  "
-      f"{'TimesFM P10':>12}  {'TimesFM P50':>12}  {'TimesFM P90':>12}")
+print(
+    f"{'Hour':>5}  {'Chronos P10':>12}  {'Chronos P50':>12}  {'Chronos P90':>12}  "
+    f"{'TimesFM P10':>12}  {'TimesFM P50':>12}  {'TimesFM P90':>12}"
+)
 print("-" * 91)
 
 c_p10 = chronos_resp.quantiles["0.1"]
@@ -58,6 +81,6 @@ t_p90 = timesfm_resp.quantiles["0.9"]
 
 for i in range(req.horizon):
     print(
-        f"{i+1:>5}  {c_p10[i]:>12.1f}  {c_p50[i]:>12.1f}  {c_p90[i]:>12.1f}  "
+        f"{i + 1:>5}  {c_p10[i]:>12.1f}  {c_p50[i]:>12.1f}  {c_p90[i]:>12.1f}  "
         f"{t_p10[i]:>12.1f}  {t_p50[i]:>12.1f}  {t_p90[i]:>12.1f}"
     )
