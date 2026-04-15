@@ -260,3 +260,24 @@ async def test_async_batch_predict_propagates_backend_exception(
     """async_batch_predict must surface exceptions raised by batch_predict()."""
     with pytest.raises(RuntimeError, match="backend exploded"):
         await error_backend.async_batch_predict([ts_request])
+
+
+# ---------------------------------------------------------------------------
+# ModelServer.update — hot-swap
+# ---------------------------------------------------------------------------
+
+
+def test_update_raises_for_unknown_deployment() -> None:
+    """update() must raise ValueError when the deployment name doesn't exist."""
+    from sheaf.api.base import ModelType
+    from sheaf.server import ModelServer
+    from sheaf.spec import ModelSpec
+
+    server = ModelServer(models=[])
+    spec = ModelSpec(
+        name="does-not-exist",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_ts",
+    )
+    with pytest.raises(ValueError, match="does-not-exist"):
+        server.update(spec)
