@@ -44,6 +44,20 @@ class _StubTimeSeriesBackend(ModelBackend):
         )
 
 
+class _ErrorBackend(ModelBackend):
+    """Backend that always raises — mirrors tests.stubs.ErrorTimeSeriesBackend."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.TIME_SERIES
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        raise RuntimeError("backend exploded")
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -216,3 +230,33 @@ def test_batch_policy_custom_values_are_stored() -> None:
     )
     assert spec.batch_policy.max_batch_size == 8
     assert spec.batch_policy.timeout_ms == 20
+
+
+# ---------------------------------------------------------------------------
+# Error propagation
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def error_backend() -> _ErrorBackend:
+    b = _ErrorBackend()
+    b.load()
+    return b
+
+
+async def test_async_predict_propagates_backend_exception(
+    error_backend: _ErrorBackend,
+    ts_request: TimeSeriesRequest,
+) -> None:
+    """async_predict must surface exceptions raised by the sync predict()."""
+    with pytest.raises(RuntimeError, match="backend exploded"):
+        await error_backend.async_predict(ts_request)
+
+
+async def test_async_batch_predict_propagates_backend_exception(
+    error_backend: _ErrorBackend,
+    ts_request: TimeSeriesRequest,
+) -> None:
+    """async_batch_predict must surface exceptions raised by batch_predict()."""
+    with pytest.raises(RuntimeError, match="backend exploded"):
+        await error_backend.async_batch_predict([ts_request])
