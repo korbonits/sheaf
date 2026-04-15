@@ -85,7 +85,7 @@ req = TimeSeriesRequest(
 
 | Type | Status | Backends |
 |---|---|---|
-| Time series | ✅ v0.1 | Chronos, Chronos-Bolt |
+| Time series | ✅ v0.1 | Chronos, Chronos-Bolt, TimesFM |
 | Tabular | 🔜 v0.2 | TabPFN |
 | Molecular / biological | 🔜 v0.2 | ESM-3, AlphaFold |
 | Audio | 🔜 v0.3 | Whisper, MusicGen |
