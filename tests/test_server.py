@@ -186,3 +186,33 @@ def test_standard_backends_registered_after_server_import() -> None:
     assert "timesfm" in _BACKEND_REGISTRY, (
         "timesfm not in registry — sheaf.backends.timesfm was not auto-imported"
     )
+
+
+# ---------------------------------------------------------------------------
+# BatchPolicy wiring
+# ---------------------------------------------------------------------------
+
+
+def test_batch_policy_defaults() -> None:
+    """BatchPolicy defaults match the @serve.batch decorator defaults."""
+    from sheaf.scheduling.batch import BatchPolicy
+
+    policy = BatchPolicy()
+    assert policy.max_batch_size == 32
+    assert policy.timeout_ms == 50
+
+
+def test_batch_policy_custom_values_are_stored() -> None:
+    """ModelSpec stores custom BatchPolicy and exposes it for __init__ wiring."""
+    from sheaf.api.base import ModelType
+    from sheaf.scheduling.batch import BatchPolicy
+    from sheaf.spec import ModelSpec
+
+    spec = ModelSpec(
+        name="test",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_ts",
+        batch_policy=BatchPolicy(max_batch_size=8, timeout_ms=20),
+    )
+    assert spec.batch_policy.max_batch_size == 8
+    assert spec.batch_policy.timeout_ms == 20
