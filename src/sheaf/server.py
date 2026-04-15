@@ -1,17 +1,34 @@
 """ModelServer — the Ray Serve entry point for Sheaf."""
 
-from typing import Any, cast
+from __future__ import annotations
+
+from typing import Annotated, Any, cast
 
 import ray
+from fastapi import FastAPI, HTTPException
+from pydantic import Field
 from ray import serve
 
-from sheaf.api.base import BaseRequest, BaseResponse
+from sheaf.api.base import BaseRequest
+from sheaf.api.tabular import TabularRequest
+from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
 from sheaf.spec import ModelSpec
 
+# Discriminated union of all supported request types.
+# FastAPI uses the `model_type` field to select the right Pydantic model
+# and return 422 if the body doesn't match any variant.
+AnyRequest = Annotated[
+    TimeSeriesRequest | TabularRequest,
+    Field(discriminator="model_type"),
+]
+
+_app = FastAPI(title="Sheaf")
+
 
 @serve.deployment
+@serve.ingress(_app)
 class _SheafDeployment:
     def __init__(self, spec: ModelSpec) -> None:
         backend_cls = _BACKEND_REGISTRY.get(spec.backend)
@@ -24,8 +41,60 @@ class _SheafDeployment:
         self._backend.load()
         self._spec = spec
 
-    async def __call__(self, request: BaseRequest) -> BaseResponse:
-        return self._backend.predict(request)
+    # ------------------------------------------------------------------
+    # Health / readiness
+    # ------------------------------------------------------------------
+
+    @_app.get("/health")
+    async def health(self) -> dict[str, str]:
+        """Liveness probe — returns 200 as long as the process is up."""
+        return {"status": "ok"}
+
+    @_app.get("/ready")
+    async def ready(self) -> dict[str, str]:
+        """Readiness probe — returns 200 once the model is loaded."""
+        return {"status": "ready", "model": self._spec.name}
+
+    # ------------------------------------------------------------------
+    # Inference
+    # ------------------------------------------------------------------
+
+    @_app.post("/predict")
+    async def predict(self, request: AnyRequest) -> dict[str, Any]:
+        """Single-item predict.
+
+        Requests are automatically batched by the @serve.batch handler
+        below — concurrent calls are grouped up to max_batch_size or
+        batch_wait_timeout_s, whichever comes first.
+        """
+        if request.model_type != self._spec.model_type:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Backend '{self._spec.name}' expects "
+                    f"model_type='{self._spec.model_type}', "
+                    f"got '{request.model_type}'"
+                ),
+            )
+        return await self._batch_predict(request)  # type: ignore[return-value]
+
+    @serve.batch(max_batch_size=32, batch_wait_timeout_s=0.05)
+    async def _batch_predict(
+        self, requests: list[BaseRequest]
+    ) -> list[dict[str, Any]]:
+        """Batched inference handler.
+
+        Ray Serve accumulates concurrent predict() calls and delivers them
+        here as a list.  Returns one dict per request in the same order.
+
+        Note: max_batch_size and batch_wait_timeout_s are fixed at class
+        definition time by @serve.batch.  The ModelSpec.batch_policy fields
+        (max_batch_size, timeout_ms) control replica-level scaling via
+        ModelServer.run() — per-deployment batch tuning will be wired in
+        a future release.
+        """
+        responses = await self._backend.async_batch_predict(requests)
+        return [r.model_dump(mode="json") for r in responses]
 
 
 class ModelServer:
@@ -36,6 +105,9 @@ class ModelServer:
             models=[chronos_spec, tabpfn_spec],
         )
         server.run()
+
+    Each model is deployed at /<name>/predict, /<name>/health,
+    and /<name>/ready.
     """
 
     def __init__(
@@ -56,10 +128,8 @@ class ModelServer:
         serve.start(http_options={"host": self._host, "port": self._port})
 
         for spec in self._models:
-            # Ray Serve adds .options() dynamically via @serve.deployment decorator
             deployment = (
-                cast(Any, _SheafDeployment)
-                .options(
+                cast(Any, _SheafDeployment).options(
                     name=spec.name,
                     num_replicas=spec.resources.replicas,
                     ray_actor_options={
@@ -69,7 +139,9 @@ class ModelServer:
                 )
                 .bind(spec)
             )
-            handle = serve.run(deployment, name=spec.name, route_prefix=f"/{spec.name}")
+            handle = serve.run(
+                deployment, name=spec.name, route_prefix=f"/{spec.name}"
+            )
             self._deployments[spec.name] = handle
 
     def shutdown(self) -> None:

@@ -1,7 +1,7 @@
 """API contract for time series foundation models (Chronos2, TimesFM, etc.)."""
 
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
@@ -31,7 +31,7 @@ class TimeSeriesRequest(BaseRequest):
     must be provided, not both.
     """
 
-    model_type: ModelType = ModelType.TIME_SERIES
+    model_type: Literal[ModelType.TIME_SERIES] = ModelType.TIME_SERIES
 
     # Input: raw history or feature store reference
     history: Annotated[list[float] | None, Field(default=None)]
@@ -62,7 +62,7 @@ class TimeSeriesRequest(BaseRequest):
 class TimeSeriesResponse(BaseResponse):
     """Response contract for time series foundation models."""
 
-    model_type: ModelType = ModelType.TIME_SERIES
+    model_type: Literal[ModelType.TIME_SERIES] = ModelType.TIME_SERIES
 
     # Mean forecast — always populated
     mean: list[float]

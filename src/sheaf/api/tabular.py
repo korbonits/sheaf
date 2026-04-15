@@ -28,7 +28,7 @@ class TabularRequest(BaseRequest):
                          and output_mode=quantiles
     """
 
-    model_type: ModelType = ModelType.TABULAR
+    model_type: Literal[ModelType.TABULAR] = ModelType.TABULAR
 
     context_X: list[list[float]]
     context_y: list[float | int]
@@ -68,7 +68,7 @@ class TabularRequest(BaseRequest):
 class TabularResponse(BaseResponse):
     """Response contract for tabular foundation models."""
 
-    model_type: ModelType = ModelType.TABULAR
+    model_type: Literal[ModelType.TABULAR] = ModelType.TABULAR
 
     # Point predictions — always populated
     # Classification: predicted class labels
