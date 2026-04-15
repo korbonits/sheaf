@@ -73,3 +73,6 @@ files = ["src/sheaf"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.uv.sources]
+chronos-forecasting = { git = "https://github.com/amazon-science/chronos-forecasting.git" }
