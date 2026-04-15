@@ -8,6 +8,7 @@ Thanks for your interest. Sheaf is early — the best contributions right now ar
 git clone https://github.com/korbonits/sheaf.git
 cd sheaf
 uv sync --extra dev
+uv run pre-commit install   # wire up pre-commit hooks (required, per-clone)
 uv run pytest tests/
 ```
 
@@ -75,12 +76,13 @@ Then add your model's optional dependencies to `pyproject.toml` under `[project.
 ## Code style
 
 ```bash
-uv run ruff check src/ tests/    # lint
-uv run ruff format src/ tests/   # format
-uv run mypy src/sheaf             # type check
+uv run ruff check src/ tests/         # lint (check)
+uv run ruff check --fix src/ tests/   # lint (auto-fix)
+uv run ruff format src/ tests/        # format
+uv run ty check src/                  # type check
 ```
 
-CI enforces lint and format on every PR.
+Pre-commit hooks run the same checks as CI (`ruff check`, `ruff format --check`, `ty check`) and block the commit if anything fails. Run `uv run pre-commit install` once after cloning to activate them.
 
 ## License
 

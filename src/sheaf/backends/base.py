@@ -1,5 +1,6 @@
 """Abstract base class for model backends."""
 
+import asyncio
 from abc import ABC, abstractmethod
 
 from sheaf.api.base import BaseRequest, BaseResponse
@@ -32,6 +33,24 @@ class ModelBackend(ABC):
         Override to implement model-type-aware batching.
         """
         return [self.predict(r) for r in requests]
+
+    async def async_predict(self, request: BaseRequest) -> BaseResponse:
+        """Async wrapper around predict(); runs in a thread executor.
+
+        Override for backends with native async inference.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.predict, request)
+
+    async def async_batch_predict(
+        self, requests: list[BaseRequest]
+    ) -> list[BaseResponse]:
+        """Async wrapper around batch_predict(); runs in a thread executor.
+
+        Override for backends with native async inference.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.batch_predict, requests)
 
     @property
     @abstractmethod
