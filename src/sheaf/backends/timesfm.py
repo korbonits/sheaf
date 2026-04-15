@@ -74,7 +74,7 @@ class TimesFMBackend(ModelBackend):
 
     def load(self) -> None:
         try:
-            import timesfm
+            import timesfm  # ty: ignore[unresolved-import]
         except ImportError as e:
             raise ImportError(
                 "timesfm is required for the TimesFM backend. "
