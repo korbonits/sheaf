@@ -23,14 +23,13 @@ Each new model type needs:
 The time series contract (`src/sheaf/api/time_series.py`) and Chronos2 backend (`src/sheaf/backends/chronos.py`) are the reference implementation. Follow that pattern.
 
 **Wanted backends (in priority order):**
-- TimesFM (`time_series`)
 - ESM-3 (`molecular`)
 - Whisper (`audio`)
 - GraphCast (`geospatial`)
 
 ### API contract feedback
 
-If you have strong opinions about what a tabular or molecular request should look like — open an issue. Getting the contracts right before building the optimizations behind them is the priority at this stage.
+If you have strong opinions about what a molecular, audio, or geospatial request should look like — open an issue. Getting the contracts right before building the optimizations behind them is the priority at this stage.
 
 ### Bug reports
 
