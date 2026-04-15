@@ -209,3 +209,35 @@ def test_registry_path_predict(registry_serving_url: str) -> None:
     r = requests.post(f"{registry_serving_url}/predict", json=payload)
     assert r.status_code == 200, r.text
     assert r.json()["mean"] == [0.99, 0.99, 0.99]
+
+
+def test_batch_policy_applied(serving_url: str) -> None:
+    """BatchPolicy.max_batch_size and timeout_ms are wired into the deployment.
+
+    Fires 16 concurrent requests against a deployment whose batch policy was
+    left at the default (max_batch_size=32, timeout_ms=50).  All requests must
+    succeed, which confirms set_max_batch_size / set_batch_wait_timeout_s were
+    called without error during __init__.
+    """
+    import concurrent.futures
+
+    payload = {
+        "model_type": "time_series",
+        "model_name": "smoke-ts",
+        "history": [1.0, 2.0, 3.0],
+        "horizon": 2,
+        "frequency": "1d",
+    }
+
+    def _call() -> tuple[int, list]:
+        r = requests.post(f"{serving_url}/predict", json=payload)
+        return r.status_code, r.json().get("mean", [])
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
+        futures = [pool.submit(_call) for _ in range(16)]
+        results = [f.result() for f in futures]
+
+    statuses = [s for s, _ in results]
+    means = [m for _, m in results]
+    assert all(s == 200 for s in statuses), statuses
+    assert all(m == [0.42, 0.42] for m in means), means

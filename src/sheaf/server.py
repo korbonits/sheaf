@@ -83,6 +83,16 @@ class _SheafDeployment:
         self._backend.load()
         self._spec = spec
 
+        # Wire BatchPolicy into the @serve.batch handler.
+        # set_max_batch_size / set_batch_wait_timeout_s are the official Ray
+        # Serve API for runtime batch parameter updates (see serve.batch docs).
+        self._batch_predict.set_max_batch_size(  # ty: ignore[unresolved-attribute]
+            spec.batch_policy.max_batch_size
+        )
+        self._batch_predict.set_batch_wait_timeout_s(  # ty: ignore[unresolved-attribute]
+            spec.batch_policy.timeout_ms / 1000.0
+        )
+
     # ------------------------------------------------------------------
     # Health / readiness
     # ------------------------------------------------------------------
@@ -127,11 +137,8 @@ class _SheafDeployment:
         Ray Serve accumulates concurrent predict() calls and delivers them
         here as a list.  Returns one dict per request in the same order.
 
-        Note: max_batch_size and batch_wait_timeout_s are fixed at class
-        definition time by @serve.batch.  The ModelSpec.batch_policy fields
-        (max_batch_size, timeout_ms) control replica-level scaling via
-        ModelServer.run() — per-deployment batch tuning will be wired in
-        a future release.
+        The decorator defaults (32 / 50 ms) are overridden per deployment by
+        __init__ using the ModelSpec.batch_policy values.
         """
         responses = await self._backend.async_batch_predict(requests)
         return [r.model_dump(mode="json") for r in responses]
