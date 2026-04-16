@@ -26,6 +26,7 @@ PyPI: `pip install sheaf-serve`
 **What works (v0.3 in progress):**
 - Audio: Whisper backend (`openai-whisper`) and faster-whisper backend (`faster-whisper` / CTranslate2) — transcription, translation, word timestamps, VAD filter, language probability; WAV decoded inline (no ffmpeg needed for WAV inputs); install with `pip install 'sheaf-serve[audio]'`
 - TTS: Bark backend (`suno/bark-small`, `suno/bark`) via HuggingFace `transformers.BarkModel` — text-to-speech with optional voice presets; outputs base64-encoded 16-bit PCM WAV at 24kHz; install with `pip install 'sheaf-serve[tts]'`
+- Vision embeddings: OpenCLIP backend (`open-clip-torch`) — image and text embeddings via CLIP/SigLIP/EVA-CLIP; `EmbeddingRequest` accepts `texts` or `images_b64` (mutually exclusive); L2-normalized by default; install with `pip install 'sheaf-serve[vision]'`
 
 **v0.3 remaining targets:**
 - ESM-3 molecular backend
@@ -54,6 +55,7 @@ src/sheaf/
     whisper.py         # WhisperBackend — openai-whisper (PyTorch)
     faster_whisper.py  # FasterWhisperBackend — faster-whisper (CTranslate2, no torch at runtime)
     bark.py            # BarkBackend — Bark TTS via HuggingFace transformers
+    open_clip.py       # OpenCLIPBackend — image/text embeddings via open-clip-torch
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
@@ -73,6 +75,7 @@ tests/
   test_whisper_backend.py         # WhisperBackend mocked tests (8 tests)
   test_faster_whisper_backend.py  # FasterWhisperBackend mocked tests (9 tests)
   test_bark_backend.py            # BarkBackend mocked tests (9 tests)
+  test_open_clip_backend.py       # OpenCLIPBackend mocked tests (12 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run)
   test_smoke_whisper.py           # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
 ```
@@ -107,6 +110,8 @@ tests/
 - **WAV without ffmpeg** — `_audio_utils.decode_audio()` parses RIFF/WAV directly to float32 numpy at 16kHz for 16/32-bit PCM. Non-WAV formats fall back to a named temp file (calling backend passes the path; the model invokes ffmpeg internally).
 - **WAV encoding** — `_audio_utils.encode_wav()` encodes a float32 numpy array to 16-bit PCM WAV bytes (pure numpy/struct, no scipy). Used by `BarkBackend` to produce the `audio_b64` response field.
 - **TTS vs ASR model_type** — `TTSRequest`/`TTSResponse` use `ModelType.TTS = "tts"`, distinct from `ModelType.AUDIO = "audio"` used by Whisper/faster-whisper. Both are in `AnyRequest` discriminated union.
+- **OpenCLIP mutually exclusive inputs** — `EmbeddingRequest` accepts either `texts: list[str]` or `images_b64: list[str]`, never both. Validated by `@model_validator`. A single request batches multiple items; `batch_predict` runs requests sequentially.
+- **PIL stored at load() time** — `OpenCLIPBackend._Image` is set to `PIL.Image` during `load()` so tests can inject a mock without PIL installed in the test environment.
 
 ## Adding a new backend
 

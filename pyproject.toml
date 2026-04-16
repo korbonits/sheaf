@@ -46,6 +46,9 @@ tts = [
     "transformers>=4.31.0",
     "torch>=2.0.0",
 ]
+vision = [
+    "open-clip-torch>=3.0.0",
+]
 molecular = [
     "fair-esm>=2.0.0",
 ]
@@ -64,7 +67,7 @@ dev = [
     "pre-commit>=3.7.0",
 ]
 all = [
-    "sheaf-serve[time-series,tabular,moirai,audio,tts,molecular,feast,milvus]",
+    "sheaf-serve[time-series,tabular,moirai,audio,tts,vision,molecular,feast,milvus]",
 ]
 
 [tool.hatch.build.targets.wheel]
