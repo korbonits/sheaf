@@ -50,6 +50,10 @@ PyPI: `pip install sheaf-serve`
 - Image diffusion: FLUX backend (`diffusers.FluxPipeline`) — FLUX.1-schnell (4 steps, guidance=0, Apache 2.0) and FLUX.1-dev (20-50 steps, guidance=3.5-7.0); `DiffusionRequest` → `DiffusionResponse` with base64-encoded PNG; bfloat16 by default; optional `enable_model_cpu_offload` for low-VRAM GPUs; seed returned in response for reproducibility; 17 mocked tests in `test_flux_backend.py`; install with `pip install 'sheaf-serve[diffusion]'`
 - Video understanding: VideoMAE / TimeSformer backend (`transformers`) — any `AutoModel`-compatible video model; `VideoRequest` accepts base64-encoded frames; embedding task returns CLS or mean-pooled 768-dim (base) / 1024-dim (large) vectors; classification task returns top-5 softmax labels + scores over Kinetics-400; 17 mocked tests in `test_videomae_backend.py`; Ray Serve smoke tests cover both embedding and classification; install with `pip install 'sheaf-serve[video]'`
 
+**What works (v0.5 Ops/DX — in progress):**
+- Structured JSON logging: `sheaf.logging.JsonFormatter` + `configure_logging()`; gated by `SHEAF_LOG_JSON=1`; request_id / latency_ms / status in every predict log line; 15 tests in `test_logging.py`
+- Prometheus metrics: `sheaf.metrics` module — `sheaf_requests_total`, `sheaf_request_duration_seconds`, `sheaf_batch_size_total`, `sheaf_backend_load_seconds`; `GET /metrics` per deployment; lazy import, `SHEAF_METRICS_DISABLED=1` guard; 337 tests passing; install with `pip install 'sheaf-serve[metrics]'`
+
 ## Repo layout
 
 ```
@@ -58,6 +62,8 @@ src/sheaf/
   spec.py              # ModelSpec, ResourceConfig — declares what to serve
   server.py            # ModelServer + _SheafDeployment — Ray Serve orchestrator
   registry.py          # @register_backend decorator + _BACKEND_REGISTRY dict
+  logging.py           # JsonFormatter + configure_logging — structured JSON logging (SHEAF_LOG_JSON=1)
+  metrics.py           # Prometheus metrics: record_predict/batch/load, register_metrics_endpoint, time_load
   api/
     base.py            # BaseRequest, BaseResponse, ModelType enum
     time_series.py     # TimeSeriesRequest/Response, Frequency, OutputMode
@@ -146,6 +152,8 @@ tests/
   test_imagebind_backend.py            # ImageBindBackend mocked tests (20 tests)
   test_flux_backend.py                 # FluxBackend mocked tests (17 tests)
   test_videomae_backend.py             # VideoMAEBackend mocked tests (17 tests)
+  test_logging.py                      # JsonFormatter + configure_logging + server integration (15 tests)
+  test_metrics.py                      # Prometheus metrics module (no-op absent/disabled + functional, 11+ tests)
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
@@ -210,6 +218,10 @@ tests/
 - **VideoMAE classification num_classes** — `logits.shape[-1]` must be an int for `min(5, num_classes)`. When mocking, set `fake_output.logits.shape = (1, 5)` as a real Python tuple (not a MagicMock attribute), otherwise `min()` comparison raises TypeError.
 - **VideoMAE `_Image` at load time** — `self._Image = _Image` is stored after `from PIL import Image as _Image` inside `load()`, following the same pattern as `DINOv2Backend`. Tests inject a mock without requiring PIL installed.
 - **Modal local-source pattern for v0.4** — `pip_install_from_pyproject` installs deps listed in `pyproject.toml` extras but does NOT install the sheaf package itself. Pre-PyPI release: use `.add_local_dir("src", remote_path="/root/src", copy=True).env({"PYTHONPATH": "/root/src"})`. `copy=True` is required so the `.env()` build step can follow. When v0.4 ships to PyPI, revert to `pip install 'sheaf-serve[video]>=0.4.0'`.
+- **Prometheus metrics — `register_metrics_endpoint` deferred in Ray Serve** — `@serve.ingress(_app)` cloudpickles `_app` at class-definition time. Registering the `/metrics` route at module level causes a `RecursionError`: cloudpickle follows the nested function's `__globals__` into `sheaf.metrics`, which holds live `CollectorRegistry` and metric objects containing `threading.Lock` (unpicklable). Fix: call `register_metrics_endpoint(_app, spec.name)` inside `_SheafDeployment.__init__`. The worker deserialises `_app` before `__init__` runs, so subsequent route additions are safe and never re-pickled.
+- **Prometheus metrics — lazy `/metrics` handler** — the `metrics()` handler in `register_metrics_endpoint` imports `prometheus_client` and calls `_get_registry()` at request time (not at route-registration time). This keeps the function's closure free of non-picklable objects, which is required by the Ray Serve path above.
+- **Structured logging** — `sheaf.logging.JsonFormatter` emits single-line JSON with `ts`, `level`, `logger`, `message`, and any `extra={}` fields. `configure_logging()` installs it idempotently on the root logger; gated by `SHEAF_LOG_JSON=1`. Both `server.py` and `modal_server.py` log `request_id`, `deployment`, `model_type`, `model_name`, `latency_ms`, `status` ("ok"/"error"), and `error` (on failures) via `logger.info/exception("predict ok/error", extra={...})`.
+- **Prometheus metrics names** — `sheaf_requests_total` (Counter, labels: deployment/model_type/status), `sheaf_request_duration_seconds` (Histogram), `sheaf_batch_size_total` (Histogram, labels: deployment), `sheaf_backend_load_seconds` (Gauge). `SHEAF_METRICS_DISABLED=1` disables all recording and endpoint registration even when `prometheus_client` is installed.
 
 ## Adding a new backend
 

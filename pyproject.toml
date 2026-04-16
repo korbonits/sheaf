@@ -100,6 +100,9 @@ video = [
 feast = [
     "feast>=0.40.0",
 ]
+metrics = [
+    "prometheus-client>=0.20.0",
+]
 modal = [
     "modal>=0.60.0",
     "cloudpickle>=3.0.0",

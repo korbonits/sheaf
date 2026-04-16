@@ -67,6 +67,7 @@ from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
+from sheaf.metrics import record_predict, register_metrics_endpoint, time_load
 from sheaf.spec import ModelSpec
 
 AnyRequest = Annotated[
@@ -154,7 +155,8 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                 f"Registered backends: {list(_BACKEND_REGISTRY)}"
             )
         backend = backend_cls(**spec.backend_kwargs)
-        backend.load()
+        with time_load(spec.name, spec.model_type):
+            backend.load()
 
         feast = None
         if spec.feast_repo_path:
@@ -184,6 +186,7 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
         configure_logging()
 
     asgi_app = FastAPI(title="Sheaf")
+    register_metrics_endpoint(asgi_app, "sheaf")
 
     @asgi_app.get("/{name}/health")
     def health(name: str) -> dict[str, str]:
@@ -244,15 +247,19 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
         }
         try:
             result = await backend.async_predict(request)
-            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _latency_s = time.perf_counter() - _t0
+            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
             _log_extra["status"] = "ok"
             _logger.info("predict ok", extra=_log_extra)
+            record_predict(name, request.model_type, "ok", _latency_s)
             return result.model_dump(mode="json")
         except Exception as exc:
-            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _latency_s = time.perf_counter() - _t0
+            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
             _log_extra["status"] = "error"
             _log_extra["error"] = f"{type(exc).__name__}: {exc}"
             _logger.exception("predict error", extra=_log_extra)
+            record_predict(name, request.model_type, "error", _latency_s)
             raise HTTPException(
                 status_code=500,
                 detail=f"{type(exc).__name__}: {exc}",

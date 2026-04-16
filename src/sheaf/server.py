@@ -57,6 +57,12 @@ from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
 from sheaf.backends.base import ModelBackend
+from sheaf.metrics import (
+    record_batch,
+    record_predict,
+    register_metrics_endpoint,
+    time_load,
+)
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
 from sheaf.spec import ModelSpec
 
@@ -158,7 +164,8 @@ class _SheafDeployment:
             configure_logging()
 
         self._backend: ModelBackend = backend_cls(**spec.backend_kwargs)
-        self._backend.load()
+        with time_load(spec.name, spec.model_type):
+            self._backend.load()
         self._spec = spec
         _logger.info(
             "backend loaded",
@@ -191,6 +198,14 @@ class _SheafDeployment:
         self._batch_predict.set_batch_wait_timeout_s(  # ty: ignore[unresolved-attribute]
             spec.batch_policy.timeout_ms / 1000.0
         )
+
+        # Prometheus /metrics endpoint — registered here (not at module level)
+        # because @serve.ingress cloudpickles _app at class-definition time.
+        # Nested functions whose __globals__ include prometheus_client internals
+        # (CollectorRegistry has threading.Lock) cause RecursionError during
+        # that serialisation.  Running here is safe: _app is already
+        # deserialised in the worker process and never re-pickled.
+        register_metrics_endpoint(_app, spec.name)
 
     # ------------------------------------------------------------------
     # Health / readiness
@@ -269,15 +284,19 @@ class _SheafDeployment:
         }
         try:
             result = await self._batch_predict(request)  # type: ignore[return-value]
-            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _latency_s = time.perf_counter() - _t0
+            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
             _log_extra["status"] = "ok"
             _logger.info("predict ok", extra=_log_extra)
+            record_predict(self._spec.name, request.model_type, "ok", _latency_s)
             return result
         except Exception as exc:
-            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _latency_s = time.perf_counter() - _t0
+            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
             _log_extra["status"] = "error"
             _log_extra["error"] = f"{type(exc).__name__}: {exc}"
             _logger.exception("predict error", extra=_log_extra)
+            record_predict(self._spec.name, request.model_type, "error", _latency_s)
             raise HTTPException(
                 status_code=500,
                 detail=f"{type(exc).__name__}: {exc}",
@@ -293,6 +312,7 @@ class _SheafDeployment:
         The decorator defaults (32 / 50 ms) are overridden per deployment by
         __init__ using the ModelSpec.batch_policy values.
         """
+        record_batch(self._spec.name, len(requests))
         responses = await self._backend.async_batch_predict(requests)
         return [r.model_dump(mode="json") for r in responses]
 
