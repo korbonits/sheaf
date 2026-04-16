@@ -25,6 +25,7 @@ import sheaf.backends.faster_whisper  # noqa: F401
 import sheaf.backends.graphcast  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.open_clip  # noqa: F401
+import sheaf.backends.prithvi  # noqa: F401
 import sheaf.backends.sam2  # noqa: F401
 import sheaf.backends.tabpfn  # noqa: F401
 import sheaf.backends.timesfm  # noqa: F401
@@ -35,6 +36,7 @@ from sheaf.api.depth import DepthRequest
 from sheaf.api.detection import DetectionRequest
 from sheaf.api.embedding import EmbeddingRequest
 from sheaf.api.molecular import MolecularRequest
+from sheaf.api.satellite import SatelliteRequest
 from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
@@ -63,7 +65,8 @@ AnyRequest = Annotated[
     | MolecularRequest
     | DepthRequest
     | DetectionRequest
-    | WeatherRequest,
+    | WeatherRequest
+    | SatelliteRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -100,6 +103,7 @@ class _SheafDeployment:
         import sheaf.backends.graphcast  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.open_clip  # noqa: F401
+        import sheaf.backends.prithvi  # noqa: F401
         import sheaf.backends.sam2  # noqa: F401
         import sheaf.backends.tabpfn  # noqa: F401
         import sheaf.backends.timesfm  # noqa: F401

@@ -27,6 +27,7 @@ from tests.stubs import (
     SmokeDetectionBackend,
     SmokeEmbeddingBackend,
     SmokeMolecularBackend,
+    SmokeSatelliteBackend,
     SmokeSegmentationBackend,
     SmokeTimeSeriesBackend,
     SmokeWeatherBackend,
@@ -139,6 +140,13 @@ def urls():
         backend_cls=SmokeWeatherBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    satellite_spec = ModelSpec(
+        name="smoke-satellite",
+        model_type=ModelType.GEOSPATIAL,
+        backend="_smoke_satellite",
+        backend_cls=SmokeSatelliteBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -151,6 +159,7 @@ def urls():
             depth_spec,
             det_spec,
             weather_spec,
+            satellite_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -171,6 +180,7 @@ def urls():
         ("smoke-depth", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-depth"),
         ("smoke-detection", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection"),
         ("smoke-weather", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather"),
+        ("smoke-satellite", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -195,6 +205,7 @@ def urls():
         "depth": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-depth",
         "detection": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection",
         "weather": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather",
+        "satellite": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite",
         "server": server,
     }
 
@@ -456,6 +467,35 @@ def test_detection_predict(urls: dict) -> None:
     assert body["scores"] == pytest.approx([0.9])
     assert body["width"] == 640
     assert body["height"] == 480
+
+
+def test_satellite_predict(urls: dict) -> None:
+    """SatelliteRequest routes correctly; scene embedding returned."""
+    import base64
+
+    import numpy as np
+
+    n_time, n_bands, h, w = 2, 6, 16, 16
+    pixels = np.zeros((n_time, n_bands, h, w), dtype=np.float32)
+    pixels_b64 = base64.b64encode(pixels.tobytes()).decode()
+
+    url = urls["satellite"]
+    payload = {
+        "model_type": "geospatial",
+        "model_name": "smoke-satellite",
+        "pixels_b64": pixels_b64,
+        "n_time": n_time,
+        "n_bands": n_bands,
+        "height": h,
+        "width": w,
+        "band_names": ["blue", "green", "red", "nir08", "swir16", "swir22"],
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["dim"] == 4
+    assert len(body["embedding"]) == 4
+    assert body["n_time"] == n_time
 
 
 def test_weather_predict(urls: dict) -> None:

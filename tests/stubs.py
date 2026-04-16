@@ -15,6 +15,7 @@ from sheaf.api.depth import DepthRequest, DepthResponse
 from sheaf.api.detection import DetectionRequest, DetectionResponse
 from sheaf.api.embedding import EmbeddingRequest, EmbeddingResponse
 from sheaf.api.molecular import MolecularRequest, MolecularResponse
+from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
 from sheaf.api.time_series import TimeSeriesRequest, TimeSeriesResponse
 from sheaf.api.weather import WeatherRequest, WeatherResponse
@@ -254,4 +255,26 @@ class SmokeWeatherBackend(ModelBackend):
             forecast_times=forecast_times,
             step_hours=6,
             n_steps=request.n_steps,
+        )
+
+
+@register_backend("_smoke_satellite")
+class SmokeSatelliteBackend(ModelBackend):
+    """Returns a fixed 4-dim all-zeros scene embedding."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.GEOSPATIAL
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, SatelliteRequest)
+        return SatelliteResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            embedding=[0.0, 0.0, 0.0, 0.0],
+            dim=4,
+            n_time=request.n_time,
         )
