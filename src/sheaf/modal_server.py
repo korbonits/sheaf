@@ -41,12 +41,50 @@ Notes:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Annotated, Any
+
+from pydantic import Field
 
 # Must be module-level: FastAPI resolves type hints via predict.__globals__
 # (the module namespace), not the local scope of _build_asgi_app.
-from sheaf.server import AnyRequest
+# Define AnyRequest here rather than importing from sheaf.server to avoid
+# pulling in ray (and its heavy transitive deps) in Modal containers.
+from sheaf.api.audio import AudioRequest, TTSRequest
+from sheaf.api.audio_generation import AudioGenerationRequest
+from sheaf.api.depth import DepthRequest
+from sheaf.api.detection import DetectionRequest
+from sheaf.api.embedding import EmbeddingRequest
+from sheaf.api.genomic import GenomicRequest
+from sheaf.api.materials import MaterialsRequest
+from sheaf.api.molecular import MolecularRequest
+from sheaf.api.multimodal_embedding import MultimodalEmbeddingRequest
+from sheaf.api.satellite import SatelliteRequest
+from sheaf.api.segmentation import SegmentationRequest
+from sheaf.api.small_molecule import SmallMoleculeRequest
+from sheaf.api.tabular import TabularRequest
+from sheaf.api.time_series import TimeSeriesRequest
+from sheaf.api.weather import WeatherRequest
 from sheaf.spec import ModelSpec
+
+AnyRequest = Annotated[
+    TimeSeriesRequest
+    | TabularRequest
+    | AudioRequest
+    | AudioGenerationRequest
+    | TTSRequest
+    | EmbeddingRequest
+    | SegmentationRequest
+    | MolecularRequest
+    | GenomicRequest
+    | MaterialsRequest
+    | SmallMoleculeRequest
+    | DepthRequest
+    | DetectionRequest
+    | WeatherRequest
+    | SatelliteRequest
+    | MultimodalEmbeddingRequest,
+    Field(discriminator="model_type"),
+]
 
 _logger = logging.getLogger(__name__)
 
@@ -210,7 +248,7 @@ class ModalServer:
         min_containers: int = 1,
     ) -> None:
         try:
-            import modal  # ty: ignore[unresolved-import]
+            import modal
         except ImportError as e:
             raise ImportError(
                 "modal is required for ModalServer. Install it with: pip install modal"
@@ -221,15 +259,40 @@ class ModalServer:
         _image = image or (
             modal.Image.debian_slim(python_version="3.11").pip_install("sheaf-serve")
         )
-        # Captured by the closure below — Modal cloudpickles the function
-        # body (including free variables) when deploying.
-        _specs = models
+
+        # Pre-pickle specs with cloudpickle so that any backend_cls classes
+        # defined in the caller's module (not importable in the remote container)
+        # are embedded by value rather than referenced by module path.
+        # Ray (a sheaf-serve dep) always installs cloudpickle, so it is
+        # available both locally and in the container image.
+        import sys
+
+        import cloudpickle as _cloudpickle
+
+        # Register each backend_cls's defining module for by-value pickling.
+        # Without this, cloudpickle serializes classes by module path + name,
+        # which fails in the container because the user's script is never there.
+        for _spec in models:
+            if _spec.backend_cls is not None:
+                _cls_mod = _spec.backend_cls.__module__
+                if _cls_mod in sys.modules:
+                    _cloudpickle.register_pickle_by_value(sys.modules[_cls_mod])
+
+        _specs_bytes: bytes = _cloudpickle.dumps(models)
 
         modal_app = modal.App(app_name)
 
-        @modal_app.function(image=_image, gpu=gpu, min_containers=min_containers)
+        @modal_app.function(
+            image=_image,
+            gpu=gpu,
+            min_containers=min_containers,
+            serialized=True,  # closure — cloudpickle instead of import-by-name
+        )
         @modal.asgi_app()
         def _serve() -> Any:
+            import cloudpickle as _cp
+
+            _specs = _cp.loads(_specs_bytes)
             return _build_asgi_app(_specs)
 
         #: ``modal.App`` instance.  Assign to a module-level variable so the

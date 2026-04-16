@@ -23,6 +23,7 @@ keeps one warm instance alive so the demo doesn't cold-start on each call.
 from __future__ import annotations
 
 import base64
+import os
 import pathlib
 
 import modal
@@ -95,7 +96,12 @@ class ChronosForecaster:
 # Tabular: TabPFN v2
 # ---------------------------------------------------------------------------
 
-_tabpfn_secret = modal.Secret.from_name("tabpfn-token", required=False)
+# Pass TABPFN_TOKEN from local env, or an empty string if not set.
+# TabPFN.load() will raise OSError if the token is missing/invalid —
+# the local entrypoint skips the classifier in that case.
+_tabpfn_secret = modal.Secret.from_dict(
+    {"TABPFN_TOKEN": os.environ.get("TABPFN_TOKEN", "")}
+)
 
 
 @app.cls(image=_tab_image, secrets=[_tabpfn_secret], min_containers=1)
