@@ -1,8 +1,12 @@
 """TabPFN backend for tabular foundation models.
 
 Requires: pip install "sheaf-serve[tabular]"
-Requires: TABPFN_TOKEN environment variable (one-time license acceptance)
-          See https://ux.priorlabs.ai to obtain a token.
+Requires: a valid TabPFN token (one-time license acceptance).
+          Token resolution order:
+            1. TABPFN_TOKEN environment variable
+            2. ~/.cache/tabpfn/auth_token
+            3. ~/.tabpfn/token (tabpfn-client cache)
+          Obtain a token at https://ux.priorlabs.ai
 """
 
 from __future__ import annotations
@@ -17,6 +21,12 @@ from sheaf.api.tabular import TabularRequest, TabularResponse
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import register_backend
 
+_AUTH_INSTRUCTIONS = (
+    "TabPFN requires a valid token. Obtain one at https://ux.priorlabs.ai, then "
+    "either set TABPFN_TOKEN='<your-token>' or run tabpfn interactively once to "
+    "cache credentials at ~/.cache/tabpfn/auth_token."
+)
+
 
 @register_backend("tabpfn")
 class TabPFNBackend(ModelBackend):
@@ -26,8 +36,14 @@ class TabPFNBackend(ModelBackend):
     (context_X, context_y) alongside query rows (query_X). There are no
     persistent model weights per dataset — the forward pass handles everything.
 
-    Requires TABPFN_TOKEN to be set in the environment:
-        export TABPFN_TOKEN="<your-api-key>"
+    Token resolution (checked at load() time):
+        1. TABPFN_TOKEN environment variable
+        2. ~/.cache/tabpfn/auth_token
+        3. ~/.tabpfn/token  (tabpfn-client cache)
+
+    In headless/container environments TABPFN_NO_BROWSER is set automatically
+    so that a missing/expired token raises TabPFNLicenseError instead of
+    attempting to open a browser.
 
     Args:
         device: "cpu", "cuda", "mps", or "auto"
@@ -52,21 +68,26 @@ class TabPFNBackend(ModelBackend):
         return ModelType.TABULAR
 
     def load(self) -> None:
-        if not os.environ.get("TABPFN_TOKEN"):
-            raise OSError(
-                "TABPFN_TOKEN is not set. Obtain a token at https://ux.priorlabs.ai "
-                "and set it with: export TABPFN_TOKEN='<your-token>'"
-            )
         try:
             from tabpfn import (  # ty: ignore[unresolved-import]
                 TabPFNClassifier,
                 TabPFNRegressor,
+            )
+            from tabpfn.browser_auth import (  # ty: ignore[unresolved-import]
+                get_cached_token,
             )
         except ImportError as e:
             raise ImportError(
                 "tabpfn is required for the TabPFN backend. "
                 "Install it with: pip install 'sheaf-serve[tabular]'"
             ) from e
+
+        if not get_cached_token():
+            raise OSError("No TabPFN token found. " + _AUTH_INSTRUCTIONS)
+
+        # Prevent browser pop-ups in headless/container environments.
+        # tabpfn checks this env var before attempting webbrowser.open().
+        os.environ.setdefault("TABPFN_NO_BROWSER", "1")
 
         self._classifier_cls = TabPFNClassifier
         self._regressor_cls = TabPFNRegressor
@@ -102,13 +123,25 @@ class TabPFNBackend(ModelBackend):
         y_ctx: np.ndarray,
         X_query: np.ndarray,
     ) -> TabularResponse:
+        try:
+            from tabpfn.errors import (  # ty: ignore[unresolved-import]
+                TabPFNLicenseError,
+            )
+        except ImportError:
+            TabPFNLicenseError = Exception  # type: ignore[assignment,misc]
+
         clf = self._classifier_cls(
             device=self._device,
             n_estimators=self._n_estimators,
             inference_precision=self._inference_precision,
             categorical_features_indices=request.categorical_feature_indices,
         )
-        clf.fit(X_ctx, y_ctx)
+        try:
+            clf.fit(X_ctx, y_ctx)
+        except TabPFNLicenseError as e:
+            raise OSError(
+                "TabPFN license error during fit. " + _AUTH_INSTRUCTIONS
+            ) from e
         preds = clf.predict(X_query)
 
         probabilities = None
@@ -133,13 +166,25 @@ class TabPFNBackend(ModelBackend):
         y_ctx: np.ndarray,
         X_query: np.ndarray,
     ) -> TabularResponse:
+        try:
+            from tabpfn.errors import (  # ty: ignore[unresolved-import]
+                TabPFNLicenseError,
+            )
+        except ImportError:
+            TabPFNLicenseError = Exception  # type: ignore[assignment,misc]
+
         reg = self._regressor_cls(
             device=self._device,
             n_estimators=self._n_estimators,
             inference_precision=self._inference_precision,
             categorical_features_indices=request.categorical_feature_indices,
         )
-        reg.fit(X_ctx, y_ctx)
+        try:
+            reg.fit(X_ctx, y_ctx)
+        except TabPFNLicenseError as e:
+            raise OSError(
+                "TabPFN license error during fit. " + _AUTH_INSTRUCTIONS
+            ) from e
         mean_preds = reg.predict(X_query, output_type="mean")
 
         quantiles = None

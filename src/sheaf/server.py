@@ -15,10 +15,14 @@ from ray import serve
 # Auto-import standard backends so they self-register via @register_backend.
 # These are side-effect-only imports; heavy deps (torch, etc.) are lazy inside load().
 # This ensures the registry is populated in Ray Serve worker processes.
+import sheaf.backends.bark  # noqa: F401
 import sheaf.backends.chronos  # noqa: F401
+import sheaf.backends.faster_whisper  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.tabpfn  # noqa: F401
 import sheaf.backends.timesfm  # noqa: F401
+import sheaf.backends.whisper  # noqa: F401
+from sheaf.api.audio import AudioRequest, TTSRequest
 from sheaf.api.base import BaseRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
@@ -37,7 +41,7 @@ for _mod in os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):
 # FastAPI uses the `model_type` field to select the right Pydantic model
 # and return 422 if the body doesn't match any variant.
 AnyRequest = Annotated[
-    TimeSeriesRequest | TabularRequest,
+    TimeSeriesRequest | TabularRequest | AudioRequest | TTSRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -64,10 +68,13 @@ class _SheafDeployment:
         # Fix: re-import standard backends (idempotent), run the extra-backends
         # loop here (guaranteed to see runtime_env env_vars), then look up from
         # the freshly-populated worker registry.
+        import sheaf.backends.bark  # noqa: F401
         import sheaf.backends.chronos  # noqa: F401
+        import sheaf.backends.faster_whisper  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.tabpfn  # noqa: F401
         import sheaf.backends.timesfm  # noqa: F401
+        import sheaf.backends.whisper  # noqa: F401
 
         for _mod in os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):
             if _mod.strip():

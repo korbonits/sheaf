@@ -127,6 +127,7 @@ class MoiraiBackend(ModelBackend):
                 context_length=self._context_length,
                 target_dim=n_variates,
                 feat_dynamic_real_dim=0,
+                past_feat_dynamic_real_dim=0,
                 patch_size=self._patch_size,
                 num_samples=self._num_samples,
             ).create_predictor(batch_size=len(group))

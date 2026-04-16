@@ -8,28 +8,30 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.2 (in progress)
+## Current state: v0.2 (complete) / v0.3 (in progress)
 
-**What works:**
-- Time series: Chronos2 and TimesFM backends, full quantile/sample/mean output modes
+**What works (v0.2):**
+- Time series: Chronos2, TimesFM, and Moirai backends, full quantile/sample/mean output modes; multivariate support
 - Tabular: TabPFN v2 backend, classification + regression
 - Ray Serve integration end-to-end: `ModelServer.run()` deploys each `ModelSpec` as a Ray Serve deployment
 - HTTP API: `GET /health`, `GET /ready`, `POST /predict` per deployment; 422 on bad input via Pydantic discriminated union
 - Async inference: `ModelBackend.async_predict` / `async_batch_predict` run sync backends in a thread executor
 - Batching: `@serve.batch` with `max_batch_size` and `timeout_ms` wired per deployment from `ModelSpec.batch_policy`
+- Service-boundary error handling: backend exceptions → structured HTTP 500, actor does not crash
+- Model hot-swap without restart: `ModelServer.update(spec)` does a rolling Ray Serve redeploy
 - Custom backends: `SHEAF_EXTRA_BACKENDS=mypackage.backends` imports extra backend modules in Ray workers at startup
 - `backend_cls` field on `ModelSpec`: pass a class directly (cloudpickled) instead of a registry name
+- Container-friendly TabPFN auth: `load()` uses tabpfn's full token resolution order (env var → `~/.cache/tabpfn/auth_token` → `~/.tabpfn/token`); sets `TABPFN_NO_BROWSER=1` automatically; `TabPFNLicenseError` at fit-time is re-raised as `OSError`
 
-**Still needed before v0.2 is done:**
-- Basic error handling at the service boundary (backend exceptions → structured 500, not actor crash)
-- Model hot-swap without restart
-- Container-friendly auth for TabPFN (TABPFN_TOKEN env var works; first-run browser flow breaks headless)
+**What works (v0.3 in progress):**
+- Audio: Whisper backend (`openai-whisper`) and faster-whisper backend (`faster-whisper` / CTranslate2) — transcription, translation, word timestamps, VAD filter, language probability; WAV decoded inline (no ffmpeg needed for WAV inputs); install with `pip install 'sheaf-serve[audio]'`
+- TTS: Bark backend (`suno/bark-small`, `suno/bark`) via HuggingFace `transformers.BarkModel` — text-to-speech with optional voice presets; outputs base64-encoded 16-bit PCM WAV at 24kHz; install with `pip install 'sheaf-serve[tts]'`
 
-**v0.3 targets:**
+**v0.3 remaining targets:**
 - ESM-3 molecular backend
-- Whisper audio backend
 - GraphCast geospatial backend
 - Feast feature resolver end-to-end
+- TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` against the live library
 
 ## Repo layout
 
@@ -46,8 +48,13 @@ src/sheaf/
   backends/
     base.py            # ModelBackend ABC: load(), predict(), async_predict(), batch_predict()
     chronos.py         # Chronos2Backend — Chronos-Bolt + Chronos-T5 families
+    moirai.py          # MoiraiBackend — Salesforce Moirai (uni2ts)
     tabpfn.py          # TabPFNBackend — TabPFN v2 classification + regression
-    timesfm.py         # TimesFMBackend (exists, structure mirrors chronos.py)
+    timesfm.py         # TimesFMBackend
+    whisper.py         # WhisperBackend — openai-whisper (PyTorch)
+    faster_whisper.py  # FasterWhisperBackend — faster-whisper (CTranslate2, no torch at runtime)
+    bark.py            # BarkBackend — Bark TTS via HuggingFace transformers
+    _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
   cache/               # stub
@@ -56,12 +63,18 @@ examples/
   quickstart.py        # Chronos time series example
   quickstart_tabular.py
   time_series_comparison.py  # Chronos vs TimesFM
+  quickstart_audio.py        # Whisper + faster-whisper transcription, word timestamps, translation
+  sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
   test_api.py
   test_tabular_api.py
   test_server.py       # ModelBackend async dispatch, AnyRequest union, registry
+  test_whisper_backend.py         # WhisperBackend mocked tests (8 tests)
+  test_faster_whisper_backend.py  # FasterWhisperBackend mocked tests (9 tests)
+  test_bark_backend.py            # BarkBackend mocked tests (9 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run)
+  test_smoke_whisper.py           # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
 ```
 
 ## Architecture
@@ -90,6 +103,10 @@ tests/
 - **`history` vs `feature_ref`** — `TimeSeriesRequest` accepts either raw float history or a Feast feature reference (mutually exclusive, validated by `@model_validator`).
 - **Bolt vs Chronos2 inference** — `Chronos2Backend` handles both `ChronosBoltPipeline` (returns fixed 9 quantiles) and `Chronos2Pipeline` (returns samples). The distinction is detected at `load()` time via `isinstance` check.
 - **TabPFN per-request fit** — TabPFN is an in-context learner. `batch_predict` runs each request independently (different context tables per request). Future: batch query rows against same context table.
+- **faster-whisper lazy generator** — `WhisperModel.transcribe()` returns `(segments_generator, info)`. The generator must be fully consumed before `info` fields (language, duration) are reliable. `FasterWhisperBackend._run()` consumes it immediately in a list comprehension. Do not partially iterate.
+- **WAV without ffmpeg** — `_audio_utils.decode_audio()` parses RIFF/WAV directly to float32 numpy at 16kHz for 16/32-bit PCM. Non-WAV formats fall back to a named temp file (calling backend passes the path; the model invokes ffmpeg internally).
+- **WAV encoding** — `_audio_utils.encode_wav()` encodes a float32 numpy array to 16-bit PCM WAV bytes (pure numpy/struct, no scipy). Used by `BarkBackend` to produce the `audio_b64` response field.
+- **TTS vs ASR model_type** — `TTSRequest`/`TTSResponse` use `ModelType.TTS = "tts"`, distinct from `ModelType.AUDIO = "audio"` used by Whisper/faster-whisper. Both are in `AnyRequest` discriminated union.
 
 ## Adding a new backend
 

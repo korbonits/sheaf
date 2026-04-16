@@ -38,6 +38,14 @@ tabular = [
 moirai = [
     "uni2ts>=2.0.0",
 ]
+audio = [
+    "openai-whisper>=20240930",
+    "faster-whisper>=1.2.1",
+]
+tts = [
+    "transformers>=4.31.0",
+    "torch>=2.0.0",
+]
 molecular = [
     "fair-esm>=2.0.0",
 ]
@@ -56,7 +64,7 @@ dev = [
     "pre-commit>=3.7.0",
 ]
 all = [
-    "sheaf-serve[time-series,tabular,moirai,molecular,feast,milvus]",
+    "sheaf-serve[time-series,tabular,moirai,audio,tts,molecular,feast,milvus]",
 ]
 
 [tool.hatch.build.targets.wheel]
