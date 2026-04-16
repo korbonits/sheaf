@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.3 complete / v0.4 next
+## Current state: v0.4 complete / v0.5 next
 
 **What works (v0.2):**
 - Time series: Chronos2, TimesFM, and Moirai backends, full quantile/sample/mean output modes; multivariate support
@@ -46,11 +46,9 @@ PyPI: `pip install sheaf-serve`
 - Ray Serve smoke coverage: all modalities have end-to-end smoke tests in `test_smoke_ray.py`
 - Feast smoke coverage: real SQLite store, materialise → resolve → predict; 8 tests in `test_smoke_feast.py`; gated on `SHEAF_SMOKE_TEST=1`
 
-**What works (v0.4, in progress):**
+**What works (v0.4):**
 - Image diffusion: FLUX backend (`diffusers.FluxPipeline`) — FLUX.1-schnell (4 steps, guidance=0, Apache 2.0) and FLUX.1-dev (20-50 steps, guidance=3.5-7.0); `DiffusionRequest` → `DiffusionResponse` with base64-encoded PNG; bfloat16 by default; optional `enable_model_cpu_offload` for low-VRAM GPUs; seed returned in response for reproducibility; 17 mocked tests in `test_flux_backend.py`; install with `pip install 'sheaf-serve[diffusion]'`
-
-**v0.4 remaining:**
-- VideoMAE / TimeSformer video understanding
+- Video understanding: VideoMAE / TimeSformer backend (`transformers`) — any `AutoModel`-compatible video model; `VideoRequest` accepts base64-encoded frames; embedding task returns CLS or mean-pooled 768-dim (base) / 1024-dim (large) vectors; classification task returns top-5 softmax labels + scores over Kinetics-400; 17 mocked tests in `test_videomae_backend.py`; Ray Serve smoke tests cover both embedding and classification; install with `pip install 'sheaf-serve[video]'`
 
 ## Repo layout
 
@@ -78,6 +76,7 @@ src/sheaf/
     satellite.py       # SatelliteRequest/Response (Prithvi)
     weather.py         # WeatherRequest/Response (GraphCast)
     diffusion.py       # DiffusionRequest/Response (FLUX)
+    video.py           # VideoRequest/Response (VideoMAE / TimeSformer)
   backends/
     base.py            # ModelBackend ABC: load(), predict(), async_predict(), batch_predict()
     chronos.py         # Chronos2Backend — Chronos-Bolt + Chronos-T5 families
@@ -101,6 +100,7 @@ src/sheaf/
     prithvi.py         # PrithviBackend — IBM/NASA Prithvi-EO geospatial embeddings (trust_remote_code=True)
     imagebind.py       # ImageBindBackend — cross-modal embeddings (text/vision/audio/depth/thermal); imagebind not on PyPI
     flux.py            # FluxBackend — FLUX.1-schnell / FLUX.1-dev image diffusion via diffusers.FluxPipeline
+    videomae.py        # VideoMAEBackend — video embeddings + classification via VideoMAE / TimeSformer
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
@@ -116,6 +116,10 @@ examples/
   quickstart_vision.py       # DINOv2 + OpenCLIP image embeddings, CLS vs mean pooling, cross-modal retrieval
   quickstart_feast.py        # Feast feature store: build repo → materialise → feature_ref requests → Chronos forecasts
   quickstart_modal.py        # Modal serverless deployment with Chronos
+  quickstart_diffusion.py    # FLUX.1-schnell: text-to-image generation, seed reproducibility, batch
+  quickstart_diffusion_modal.py  # FLUX on Modal (T4): local-source workaround, tiny-flux-pipe for CI
+  quickstart_video.py        # VideoMAE embeddings (CLS + mean pooling) + action classification
+  quickstart_video_modal.py  # VideoMAE on Modal (T4): embed + classify synthetic clips
   sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
@@ -141,6 +145,7 @@ tests/
   test_prithvi_backend.py              # PrithviBackend mocked tests (14 tests)
   test_imagebind_backend.py            # ImageBindBackend mocked tests (20 tests)
   test_flux_backend.py                 # FluxBackend mocked tests (17 tests)
+  test_videomae_backend.py             # VideoMAEBackend mocked tests (17 tests)
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
@@ -200,6 +205,11 @@ tests/
 - **FLUX pipeline call chain** — `FluxPipeline.from_pretrained(model_id, torch_dtype=...).to(device)` returns the pipeline instance. Calling `pipeline(prompt=..., ...)` returns an object with `.images[0]` being a PIL image. Mock chain in tests: `pipeline_cls.from_pretrained.return_value.to.return_value = instance` and `instance.return_value.images = [fake_img]`.
 - **FLUX dtype resolution** — `torch_dtype` is stored as a string (`"bfloat16"`) at `__init__` time; resolved to the actual `torch.dtype` inside `load()` via a dict lookup. This avoids importing torch at construction time.
 - **FLUX CPU offload** — when `enable_model_cpu_offload=True`, `pipeline.enable_model_cpu_offload()` is called on the pre-`.to()` pipeline object (not the instance). `.to(device)` is skipped in this path. Tests assert `instance.to.assert_not_called()`.
+- **VideoMAE frame input** — `VideoRequest.frames_b64` is a list of base64-encoded PNG/JPEG frames (min_length=1); validated at request boundary. `VideoMAEBackend._run()` decodes each frame via `PIL.Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")` and passes the list to `AutoImageProcessor`.
+- **VideoMAE pooling strategies** — CLS token at `hidden[:, 0, :]` (default); mean of patch tokens at `hidden[:, 1:, :]` when `pooling="mean"`. L2-normalized if `request.normalize=True`.
+- **VideoMAE classification num_classes** — `logits.shape[-1]` must be an int for `min(5, num_classes)`. When mocking, set `fake_output.logits.shape = (1, 5)` as a real Python tuple (not a MagicMock attribute), otherwise `min()` comparison raises TypeError.
+- **VideoMAE `_Image` at load time** — `self._Image = _Image` is stored after `from PIL import Image as _Image` inside `load()`, following the same pattern as `DINOv2Backend`. Tests inject a mock without requiring PIL installed.
+- **Modal local-source pattern for v0.4** — `pip_install_from_pyproject` installs deps listed in `pyproject.toml` extras but does NOT install the sheaf package itself. Pre-PyPI release: use `.add_local_dir("src", remote_path="/root/src", copy=True).env({"PYTHONPATH": "/root/src"})`. `copy=True` is required so the `.env()` build step can follow. When v0.4 ships to PyPI, revert to `pip install 'sheaf-serve[video]>=0.4.0'`.
 
 ## Adding a new backend
 
