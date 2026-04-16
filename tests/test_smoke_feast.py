@@ -22,7 +22,6 @@ from __future__ import annotations
 import datetime
 import os
 
-import pandas as pd
 import pytest
 from starlette.testclient import TestClient
 
@@ -53,6 +52,8 @@ _TICKERS = {
 
 def _build_feast_repo(tmpdir: str) -> None:
     """Apply feature definitions and materialise data into a SQLite online store."""
+    import pandas as pd
+
     feast = pytest.importorskip("feast")
     from feast import Entity, FeatureView, Field, FileSource
     from feast.types import Array, Float32
