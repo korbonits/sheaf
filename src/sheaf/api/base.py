@@ -17,6 +17,7 @@ class ModelType(str, Enum):
     AUDIO = "audio"
     TTS = "tts"
     EMBEDDING = "embedding"
+    SEGMENTATION = "segmentation"
 
 
 class BaseRequest(BaseModel):

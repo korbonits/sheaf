@@ -49,6 +49,7 @@ tts = [
 vision = [
     "open-clip-torch>=3.0.0",
     "transformers>=4.37.0",
+    "sam2>=1.0",
 ]
 molecular = [
     "fair-esm>=2.0.0",

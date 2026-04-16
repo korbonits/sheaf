@@ -21,12 +21,14 @@ import sheaf.backends.dinov2  # noqa: F401
 import sheaf.backends.faster_whisper  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.open_clip  # noqa: F401
+import sheaf.backends.sam2  # noqa: F401
 import sheaf.backends.tabpfn  # noqa: F401
 import sheaf.backends.timesfm  # noqa: F401
 import sheaf.backends.whisper  # noqa: F401
 from sheaf.api.audio import AudioRequest, TTSRequest
 from sheaf.api.base import BaseRequest
 from sheaf.api.embedding import EmbeddingRequest
+from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.backends.base import ModelBackend
@@ -44,7 +46,12 @@ for _mod in os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):
 # FastAPI uses the `model_type` field to select the right Pydantic model
 # and return 422 if the body doesn't match any variant.
 AnyRequest = Annotated[
-    TimeSeriesRequest | TabularRequest | AudioRequest | TTSRequest | EmbeddingRequest,
+    TimeSeriesRequest
+    | TabularRequest
+    | AudioRequest
+    | TTSRequest
+    | EmbeddingRequest
+    | SegmentationRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -77,6 +84,7 @@ class _SheafDeployment:
         import sheaf.backends.faster_whisper  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.open_clip  # noqa: F401
+        import sheaf.backends.sam2  # noqa: F401
         import sheaf.backends.tabpfn  # noqa: F401
         import sheaf.backends.timesfm  # noqa: F401
         import sheaf.backends.whisper  # noqa: F401
