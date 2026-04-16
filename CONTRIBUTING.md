@@ -23,9 +23,12 @@ Each new model type needs:
 
 The time series contract (`src/sheaf/api/time_series.py`) and Chronos2 backend (`src/sheaf/backends/chronos.py`) are the reference implementation. Follow that pattern.
 
-**Wanted backends (in priority order):**
-- FLUX (`diffusion`) — image generation via diffusers
-- VideoMAE / TimeSformer (`video`) — video understanding / classification
+**Wanted backends (v0.5 targets, in priority order):**
+- LiDAR / 3D point cloud (PointNet++, OpenShape)
+- Pose estimation (ViTPose, MediaPipe)
+- Optical flow (RAFT, UniMatch)
+- Multimodal generation — text+image-conditioned (SDXL, CogVideoX)
+- Speech synthesis with fine-grained control (StyleTTS2, Kokoro)
 
 ### API contract feedback
 
@@ -72,7 +75,7 @@ class MyModelBackend(ModelBackend):
 
 Then add your model's optional dependencies to `pyproject.toml` under `[project.optional-dependencies]`.
 
-## Implemented backends (v0.3 — complete)
+## Implemented backends (v0.4 — complete)
 
 All backends below are implemented, tested, and wired into the Ray Serve smoke suite:
 
@@ -98,6 +101,8 @@ All backends below are implemented, tested, and wired into the Ray Serve smoke s
 | Prithvi | `prithvi` | `earth-observation` | IBM/NASA geospatial embeddings |
 | GraphCast | `graphcast` | `weather` | Google DeepMind weather forecasting |
 | ImageBind | `imagebind` | `multimodal` | Cross-modal embeddings; install from source (not on PyPI) |
+| FLUX | `flux` | `diffusion` | FLUX.1-schnell / FLUX.1-dev image generation |
+| VideoMAE | `videomae` | `video` | VideoMAE / TimeSformer embeddings + Kinetics-400 classification |
 
 ## Feast feature store integration
 

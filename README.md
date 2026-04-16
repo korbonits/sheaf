@@ -176,9 +176,26 @@ See [`examples/`](examples/) for time series comparison, tabular, audio, vision,
 - [x] Feast feature store integration (`feature_ref` in requests, `FeastResolver`, `feast_repo_path` on `ModelSpec`)
 - [x] Modal serverless deployment (`ModalServer` — zero-infra alternative to Ray Serve)
 
-**v0.4 — generation + video**
-- [ ] FLUX diffusion / image generation
-- [ ] VideoMAE / TimeSformer video understanding
+**v0.4 — generation + video (complete)**
+- [x] FLUX diffusion / image generation
+- [x] VideoMAE / TimeSformer video understanding
+
+**v0.5 — serving quality + new modalities**
+
+Serving / infra:
+- [ ] Streaming responses (token-by-token latency for diffusion and TTS)
+- [ ] Request caching (`cache/` layer — currently a stub)
+- [ ] `bucket_by` batching — group requests by horizon/length before `@serve.batch`
+- [ ] Prometheus metrics endpoint per deployment
+- [ ] OpenTelemetry traces through the request path
+- [ ] Structured logging with request IDs end-to-end
+
+New model types:
+- [ ] LiDAR / 3D point cloud (PointNet++, OpenShape)
+- [ ] Pose estimation (ViTPose, MediaPipe)
+- [ ] Optical flow (RAFT, UniMatch)
+- [ ] Multimodal generation — text+image-conditioned (SDXL, CogVideoX)
+- [ ] Speech synthesis with fine-grained control (StyleTTS2, Kokoro)
 
 ---
 
