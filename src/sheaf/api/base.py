@@ -19,6 +19,7 @@ class ModelType(str, Enum):
     DIFFUSION = "diffusion"
     NEURAL_OPERATOR = "neural_operator"
     AUDIO = "audio"
+    AUDIO_GENERATION = "audio_generation"
     TTS = "tts"
     EMBEDDING = "embedding"
     SEGMENTATION = "segmentation"

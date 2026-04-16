@@ -26,6 +26,7 @@ import sheaf.backends.graphcast  # noqa: F401
 import sheaf.backends.mace  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.molformer  # noqa: F401
+import sheaf.backends.musicgen  # noqa: F401
 import sheaf.backends.nucleotide_transformer  # noqa: F401
 import sheaf.backends.open_clip  # noqa: F401
 import sheaf.backends.prithvi  # noqa: F401
@@ -34,6 +35,7 @@ import sheaf.backends.tabpfn  # noqa: F401
 import sheaf.backends.timesfm  # noqa: F401
 import sheaf.backends.whisper  # noqa: F401
 from sheaf.api.audio import AudioRequest, TTSRequest
+from sheaf.api.audio_generation import AudioGenerationRequest
 from sheaf.api.base import BaseRequest
 from sheaf.api.depth import DepthRequest
 from sheaf.api.detection import DetectionRequest
@@ -65,6 +67,7 @@ AnyRequest = Annotated[
     TimeSeriesRequest
     | TabularRequest
     | AudioRequest
+    | AudioGenerationRequest
     | TTSRequest
     | EmbeddingRequest
     | SegmentationRequest
@@ -113,6 +116,7 @@ class _SheafDeployment:
         import sheaf.backends.mace  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.molformer  # noqa: F401
+        import sheaf.backends.musicgen  # noqa: F401
         import sheaf.backends.nucleotide_transformer  # noqa: F401
         import sheaf.backends.open_clip  # noqa: F401
         import sheaf.backends.prithvi  # noqa: F401

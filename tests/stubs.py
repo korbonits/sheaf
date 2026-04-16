@@ -10,6 +10,7 @@ import base64
 
 import numpy as np
 
+from sheaf.api.audio_generation import AudioGenerationRequest, AudioGenerationResponse
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 from sheaf.api.depth import DepthRequest, DepthResponse
 from sheaf.api.detection import DetectionRequest, DetectionResponse
@@ -328,6 +329,34 @@ class SmokeMaterialsBackend(ModelBackend):
             energy=-42.0,
             forces_b64=forces_b64,
             n_atoms=n,
+        )
+
+
+@register_backend("_smoke_audio_generation")
+class SmokeAudioGenerationBackend(ModelBackend):
+    """Returns a minimal silent WAV for any generation prompt."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.AUDIO_GENERATION
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, AudioGenerationRequest)
+        # 0.1s silent WAV at 32000 Hz
+        n_samples = 3200
+        from sheaf.backends._audio_utils import encode_wav
+
+        silent = np.zeros(n_samples, dtype=np.float32)
+        wav_bytes = encode_wav(silent, 32000)
+        return AudioGenerationResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            audio_b64=base64.b64encode(wav_bytes).decode(),
+            sampling_rate=32000,
+            duration_s=n_samples / 32000,
         )
 
 

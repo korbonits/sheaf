@@ -23,6 +23,7 @@ from sheaf.api.base import ModelType
 from sheaf.spec import ModelSpec, ResourceConfig
 from tests.stubs import (
     ErrorTimeSeriesBackend,
+    SmokeAudioGenerationBackend,
     SmokeDepthBackend,
     SmokeDetectionBackend,
     SmokeEmbeddingBackend,
@@ -171,6 +172,13 @@ def urls():
         backend_cls=SmokeSmallMoleculeBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    audio_gen_spec = ModelSpec(
+        name="smoke-audio-generation",
+        model_type=ModelType.AUDIO_GENERATION,
+        backend="_smoke_audio_generation",
+        backend_cls=SmokeAudioGenerationBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -187,6 +195,7 @@ def urls():
             genomic_spec,
             materials_spec,
             small_mol_spec,
+            audio_gen_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -213,6 +222,10 @@ def urls():
         (
             "smoke-small-molecule",
             f"http://127.0.0.1:{_SMOKE_PORT}/smoke-small-molecule",
+        ),
+        (
+            "smoke-audio-generation",
+            f"http://127.0.0.1:{_SMOKE_PORT}/smoke-audio-generation",
         ),
     ]:
         deadline = time.time() + 30
@@ -242,6 +255,7 @@ def urls():
         "genomic": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-genomic",
         "materials": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-materials",
         "small_molecule": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-small-molecule",
+        "audio_generation": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-audio-generation",
         "server": server,
     }
 
@@ -638,6 +652,25 @@ def test_genomic_predict(urls: dict) -> None:
     assert body["dim"] == 4
     assert len(body["embeddings"]) == 2
     assert len(body["embeddings"][0]) == 4
+
+
+def test_audio_generation_predict(urls: dict) -> None:
+    """AudioGenerationRequest routes correctly; WAV audio returned."""
+    url = urls["audio_generation"]
+    payload = {
+        "model_type": "audio_generation",
+        "model_name": "smoke-audio-generation",
+        "prompt": "happy jazz piano",
+        "duration_s": 5.0,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["sampling_rate"] == 32000
+    assert body["duration_s"] > 0
+    wav_bytes = base64.b64decode(body["audio_b64"])
+    assert wav_bytes[:4] == b"RIFF"
+    assert wav_bytes[8:12] == b"WAVE"
 
 
 def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:
