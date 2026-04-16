@@ -32,12 +32,13 @@ PyPI: `pip install sheaf-serve`
 - Depth estimation: Depth Anything v2 backend (`transformers`) — monocular depth estimation; returns base64-encoded float32 depth map + min/max; install with `pip install 'sheaf-serve[vision]'`
 - Object detection: DETR/RT-DETR backend (`transformers`) — any `AutoModelForObjectDetection`-compatible model; returns boxes in `[x1,y1,x2,y2]` pixel coords, class labels, scores; install with `pip install 'sheaf-serve[vision]'`
 - Molecular embeddings: ESM-3 backend (`esm>=3.0.0`) — protein sequence embeddings via EvolutionaryScale ESM-3; CLS or mean pooling; **Python 3.12+ required**; install with `pip install 'sheaf-serve[molecular]'`
-- Ray Serve smoke coverage: all 8 modalities (time_series, tabular, audio, tts, embedding, segmentation, molecular, depth, detection) now have end-to-end smoke tests in `test_smoke_ray.py`
+- Weather forecasting: GraphCast backend (`graphcast`, `dm-haiku`, `jax`, `xarray`) — autoregressive n-step rollout from ERA5 surface+atmospheric fields; checkpoint loaded from `.npz`; install with `pip install 'sheaf-serve[weather]'`
+- Earth observation: Prithvi backend (`transformers`, `torch`) — IBM/NASA Prithvi-EO geospatial embeddings via `AutoModel` + `AutoImageProcessor` with `trust_remote_code=True`; `SatelliteRequest` accepts `(n_time, n_bands, H, W)` float32 pixels; per-band z-score normalization; CLS and mean pooling; install with `pip install 'sheaf-serve[earth-observation]'`
+- TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` + `predict()` against the live library; 8 tests in `test_tabpfn_integration.py`
+- Ray Serve smoke coverage: all 10 modalities (time_series, tabular, audio, tts, embedding, segmentation, molecular, depth, detection, geospatial) now have end-to-end smoke tests in `test_smoke_ray.py`
 
 **v0.3 remaining targets:**
-- GraphCast geospatial backend
 - Feast feature resolver end-to-end
-- TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` against the live library
 
 ## Repo layout
 
@@ -66,6 +67,8 @@ src/sheaf/
     depth_anything.py  # DepthAnythingBackend — monocular depth estimation via transformers
     detr.py            # DETRBackend — object detection via DETR/RT-DETR (AutoModelForObjectDetection)
     esm3.py            # ESM3Backend — protein sequence embeddings via EvolutionaryScale esm (Python 3.12+)
+    graphcast.py       # GraphCastBackend — weather forecasting via google-deepmind/graphcast (JAX/Haiku)
+    prithvi.py         # PrithviBackend — IBM/NASA Prithvi-EO geospatial embeddings (trust_remote_code=True)
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
@@ -92,7 +95,10 @@ tests/
   test_depth_anything_backend.py  # DepthAnythingBackend mocked tests (10 tests)
   test_detr_backend.py            # DETRBackend mocked tests (11 tests)
   test_esm3_backend.py            # ESM3Backend mocked tests (10 tests)
-  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all 9 modalities
+  test_graphcast_backend.py       # GraphCastBackend mocked tests (16 tests)
+  test_prithvi_backend.py         # PrithviBackend mocked tests (14 tests)
+  test_tabpfn_integration.py      # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
+  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all 10 modalities
   test_smoke_whisper.py           # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
 ```
 
@@ -134,6 +140,10 @@ tests/
 - **Depth Anything normalization** — `DepthRequest.normalize=True` (default) maps raw depth to `[0, 1]` via `(d - min) / range`. `DepthResponse.depth_b64` is a base64-encoded flat float32 byte array; reshape with `np.frombuffer(..., dtype=np.float32).reshape(height, width)`.
 - **DETR target_sizes ordering** — PIL `.size` returns `(W, H)` but `post_process_object_detection` requires `target_sizes=[(H, W)]`. The backend unpacks as `img_width, img_height = img.size` and reverses for the call.
 - **`_real_import` pattern in tests** — when patching `builtins.__import__` to block a specific module, capture `_real_import = builtins.__import__` first and delegate all non-blocked imports to it. Avoids infinite recursion when the backend's `load()` does `from PIL import Image` (which re-enters `__import__`). Inject any needed mocks via `sys.modules` instead of relying on `__import__` for them.
+- **Prithvi `trust_remote_code=True`** — `PrithviBackend` passes `trust_remote_code=True` to both `AutoModel.from_pretrained` and `AutoImageProcessor.from_pretrained`. `self._processor` is stored at `load()` time (like `self._Image` in vision backends) for test injectability.
+- **Prithvi normalization** — `_normalize()` broadcasts processor `image_mean`/`image_std` over `(n_time, n_bands, H, W)` axis=1. Skips silently if processor lacks those attrs (`AttributeError`/`TypeError`) or if band count mismatches.
+- **GraphCast checkpoint** — `GraphCastBackend.load()` opens `checkpoint_path` with `pickle.load` (the `.npz` checkpoint is actually a pickle). Haiku `transform_with_state` is JIT-compiled at load time; tests patch `builtins.open` with `mock_open()` to avoid FileNotFoundError.
+- **SatelliteRequest pixels layout** — `pixels_b64` encodes a `(n_time, n_bands, H, W)` float32 array. `PrithviBackend` decodes, optionally normalizes, then unsqueezes to `(1, n_time, n_bands, H, W)` before the model call.
 
 ## Adding a new backend
 
