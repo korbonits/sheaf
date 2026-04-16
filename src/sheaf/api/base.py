@@ -11,6 +11,7 @@ class ModelType(str, Enum):
     TIME_SERIES = "time_series"
     TABULAR = "tabular"
     MOLECULAR = "molecular"
+    GENOMIC = "genomic"
     GEOSPATIAL = "geospatial"
     WEATHER = "weather"
     DIFFUSION = "diffusion"

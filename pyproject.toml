@@ -64,6 +64,10 @@ earth-observation = [
     "transformers>=4.37.0",  # Prithvi uses trust_remote_code=True
     "torch>=2.0.0",
 ]
+genomics = [
+    "transformers>=4.37.0",  # Nucleotide Transformer via AutoModel + AutoTokenizer
+    "torch>=2.0.0",
+]
 feast = [
     "feast>=0.40.0",
 ]

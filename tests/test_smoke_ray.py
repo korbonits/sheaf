@@ -26,6 +26,7 @@ from tests.stubs import (
     SmokeDepthBackend,
     SmokeDetectionBackend,
     SmokeEmbeddingBackend,
+    SmokeGenomicBackend,
     SmokeMolecularBackend,
     SmokeSatelliteBackend,
     SmokeSegmentationBackend,
@@ -147,6 +148,13 @@ def urls():
         backend_cls=SmokeSatelliteBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    genomic_spec = ModelSpec(
+        name="smoke-genomic",
+        model_type=ModelType.GENOMIC,
+        backend="_smoke_genomic",
+        backend_cls=SmokeGenomicBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -160,6 +168,7 @@ def urls():
             det_spec,
             weather_spec,
             satellite_spec,
+            genomic_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -181,6 +190,7 @@ def urls():
         ("smoke-detection", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection"),
         ("smoke-weather", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather"),
         ("smoke-satellite", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite"),
+        ("smoke-genomic", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-genomic"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -206,6 +216,7 @@ def urls():
         "detection": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection",
         "weather": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather",
         "satellite": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite",
+        "genomic": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-genomic",
         "server": server,
     }
 
@@ -540,6 +551,22 @@ def test_weather_predict(urls: dict) -> None:
     assert body["forecast_times"][1] == "2023-01-02T00:00:00"
     assert "2m_temperature" in body["surface_forecasts"][0]
     assert "temperature" in body["atmospheric_forecasts"][0]
+
+
+def test_genomic_predict(urls: dict) -> None:
+    """GenomicRequest routes correctly; embeddings returned for each sequence."""
+    url = urls["genomic"]
+    payload = {
+        "model_type": "genomic",
+        "model_name": "smoke-genomic",
+        "sequences": ["ATCGATCG", "GCTAGCTA"],
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["dim"] == 4
+    assert len(body["embeddings"]) == 2
+    assert len(body["embeddings"][0]) == 4
 
 
 def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:

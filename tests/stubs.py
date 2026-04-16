@@ -14,6 +14,7 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 from sheaf.api.depth import DepthRequest, DepthResponse
 from sheaf.api.detection import DetectionRequest, DetectionResponse
 from sheaf.api.embedding import EmbeddingRequest, EmbeddingResponse
+from sheaf.api.genomic import GenomicRequest, GenomicResponse
 from sheaf.api.molecular import MolecularRequest, MolecularResponse
 from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
@@ -277,4 +278,26 @@ class SmokeSatelliteBackend(ModelBackend):
             embedding=[0.0, 0.0, 0.0, 0.0],
             dim=4,
             n_time=request.n_time,
+        )
+
+
+@register_backend("_smoke_genomic")
+class SmokeGenomicBackend(ModelBackend):
+    """Returns fixed 4-dim zero embeddings for each input sequence."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.GENOMIC
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, GenomicRequest)
+        n = len(request.sequences)
+        return GenomicResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            embeddings=[[0.0, 0.0, 0.0, 0.0]] * n,
+            dim=4,
         )
