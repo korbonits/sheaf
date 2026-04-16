@@ -18,6 +18,7 @@ class ModelType(str, Enum):
     TTS = "tts"
     EMBEDDING = "embedding"
     SEGMENTATION = "segmentation"
+    DEPTH = "depth"
 
 
 class BaseRequest(BaseModel):

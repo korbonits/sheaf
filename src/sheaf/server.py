@@ -17,6 +17,7 @@ from ray import serve
 # This ensures the registry is populated in Ray Serve worker processes.
 import sheaf.backends.bark  # noqa: F401
 import sheaf.backends.chronos  # noqa: F401
+import sheaf.backends.depth_anything  # noqa: F401
 import sheaf.backends.dinov2  # noqa: F401
 import sheaf.backends.esm3  # noqa: F401
 import sheaf.backends.faster_whisper  # noqa: F401
@@ -28,6 +29,7 @@ import sheaf.backends.timesfm  # noqa: F401
 import sheaf.backends.whisper  # noqa: F401
 from sheaf.api.audio import AudioRequest, TTSRequest
 from sheaf.api.base import BaseRequest
+from sheaf.api.depth import DepthRequest
 from sheaf.api.embedding import EmbeddingRequest
 from sheaf.api.molecular import MolecularRequest
 from sheaf.api.segmentation import SegmentationRequest
@@ -54,7 +56,8 @@ AnyRequest = Annotated[
     | TTSRequest
     | EmbeddingRequest
     | SegmentationRequest
-    | MolecularRequest,
+    | MolecularRequest
+    | DepthRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -83,6 +86,7 @@ class _SheafDeployment:
         # the freshly-populated worker registry.
         import sheaf.backends.bark  # noqa: F401
         import sheaf.backends.chronos  # noqa: F401
+        import sheaf.backends.depth_anything  # noqa: F401
         import sheaf.backends.dinov2  # noqa: F401
         import sheaf.backends.esm3  # noqa: F401
         import sheaf.backends.faster_whisper  # noqa: F401
