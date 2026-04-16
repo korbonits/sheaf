@@ -13,6 +13,7 @@ class ModelType(str, Enum):
     MOLECULAR = "molecular"
     GENOMIC = "genomic"
     MATERIALS = "materials"
+    SMALL_MOLECULE = "small_molecule"
     GEOSPATIAL = "geospatial"
     WEATHER = "weather"
     DIFFUSION = "diffusion"

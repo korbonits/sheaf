@@ -25,6 +25,7 @@ import sheaf.backends.faster_whisper  # noqa: F401
 import sheaf.backends.graphcast  # noqa: F401
 import sheaf.backends.mace  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
+import sheaf.backends.molformer  # noqa: F401
 import sheaf.backends.nucleotide_transformer  # noqa: F401
 import sheaf.backends.open_clip  # noqa: F401
 import sheaf.backends.prithvi  # noqa: F401
@@ -42,6 +43,7 @@ from sheaf.api.materials import MaterialsRequest
 from sheaf.api.molecular import MolecularRequest
 from sheaf.api.satellite import SatelliteRequest
 from sheaf.api.segmentation import SegmentationRequest
+from sheaf.api.small_molecule import SmallMoleculeRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.api.weather import WeatherRequest
@@ -69,6 +71,7 @@ AnyRequest = Annotated[
     | MolecularRequest
     | GenomicRequest
     | MaterialsRequest
+    | SmallMoleculeRequest
     | DepthRequest
     | DetectionRequest
     | WeatherRequest
@@ -109,6 +112,7 @@ class _SheafDeployment:
         import sheaf.backends.graphcast  # noqa: F401
         import sheaf.backends.mace  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
+        import sheaf.backends.molformer  # noqa: F401
         import sheaf.backends.nucleotide_transformer  # noqa: F401
         import sheaf.backends.open_clip  # noqa: F401
         import sheaf.backends.prithvi  # noqa: F401

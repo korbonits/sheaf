@@ -31,6 +31,7 @@ from tests.stubs import (
     SmokeMolecularBackend,
     SmokeSatelliteBackend,
     SmokeSegmentationBackend,
+    SmokeSmallMoleculeBackend,
     SmokeTimeSeriesBackend,
     SmokeWeatherBackend,
 )
@@ -163,6 +164,13 @@ def urls():
         backend_cls=SmokeMaterialsBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    small_mol_spec = ModelSpec(
+        name="smoke-small-molecule",
+        model_type=ModelType.SMALL_MOLECULE,
+        backend="_smoke_small_molecule",
+        backend_cls=SmokeSmallMoleculeBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -178,6 +186,7 @@ def urls():
             satellite_spec,
             genomic_spec,
             materials_spec,
+            small_mol_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -201,6 +210,10 @@ def urls():
         ("smoke-satellite", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite"),
         ("smoke-genomic", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-genomic"),
         ("smoke-materials", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-materials"),
+        (
+            "smoke-small-molecule",
+            f"http://127.0.0.1:{_SMOKE_PORT}/smoke-small-molecule",
+        ),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -228,6 +241,7 @@ def urls():
         "satellite": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite",
         "genomic": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-genomic",
         "materials": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-materials",
+        "small_molecule": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-small-molecule",
         "server": server,
     }
 
@@ -562,6 +576,22 @@ def test_weather_predict(urls: dict) -> None:
     assert body["forecast_times"][1] == "2023-01-02T00:00:00"
     assert "2m_temperature" in body["surface_forecasts"][0]
     assert "temperature" in body["atmospheric_forecasts"][0]
+
+
+def test_small_molecule_predict(urls: dict) -> None:
+    """SmallMoleculeRequest routes correctly; embeddings returned per SMILES."""
+    url = urls["small_molecule"]
+    payload = {
+        "model_type": "small_molecule",
+        "model_name": "smoke-small-molecule",
+        "smiles": ["CC(=O)OC1=CC=CC=C1C(=O)O", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"],
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["dim"] == 4
+    assert len(body["embeddings"]) == 2
+    assert len(body["embeddings"][0]) == 4
 
 
 def test_materials_predict(urls: dict) -> None:

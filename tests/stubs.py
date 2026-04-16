@@ -19,6 +19,7 @@ from sheaf.api.materials import MaterialsRequest, MaterialsResponse
 from sheaf.api.molecular import MolecularRequest, MolecularResponse
 from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
+from sheaf.api.small_molecule import SmallMoleculeRequest, SmallMoleculeResponse
 from sheaf.api.time_series import TimeSeriesRequest, TimeSeriesResponse
 from sheaf.api.weather import WeatherRequest, WeatherResponse
 from sheaf.backends.base import ModelBackend
@@ -327,4 +328,26 @@ class SmokeMaterialsBackend(ModelBackend):
             energy=-42.0,
             forces_b64=forces_b64,
             n_atoms=n,
+        )
+
+
+@register_backend("_smoke_small_molecule")
+class SmokeSmallMoleculeBackend(ModelBackend):
+    """Returns fixed 4-dim zero embeddings for each input SMILES."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.SMALL_MOLECULE
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, SmallMoleculeRequest)
+        n = len(request.smiles)
+        return SmallMoleculeResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            embeddings=[[0.0, 0.0, 0.0, 0.0]] * n,
+            dim=4,
         )

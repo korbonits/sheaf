@@ -71,6 +71,10 @@ genomics = [
 materials = [
     "mace-torch>=0.3.0",  # MACE-MP-0 universal interatomic potential; brings torch + ase
 ]
+small-molecule = [
+    "transformers>=4.37.0",  # MolFormer via AutoModel + AutoTokenizer (trust_remote_code)
+    "torch>=2.0.0",
+]
 feast = [
     "feast>=0.40.0",
 ]
