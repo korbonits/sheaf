@@ -34,24 +34,29 @@ app = modal.App("sheaf-quickstart")
 # Images — one per model family to keep layers independent
 # ---------------------------------------------------------------------------
 
+# sheaf-serve is not yet published with these backends; install local source.
+# add_local_python_source mounts src/sheaf into the container at build time.
+_sheaf_deps = ["pydantic>=2.0.0", "numpy>=1.24.0"]
+
 # Chronos only (skip TimesFM/JAX to keep the image lean for this demo)
-_ts_image = modal.Image.debian_slim(python_version="3.11").pip_install(
-    "sheaf-serve",
-    "chronos-forecasting>=1.0.0",
-    "torch>=2.1,<2.5",
+_ts_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install(*_sheaf_deps, "chronos-forecasting>=1.0.0", "torch>=2.1,<2.5")
+    .add_local_python_source("sheaf")
 )
 
 # TabPFN — CPU-only, no torch extras needed beyond what tabpfn pulls in
-_tab_image = modal.Image.debian_slim(python_version="3.11").pip_install(
-    "sheaf-serve",
-    "tabpfn>=2.0.0",
+_tab_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install(*_sheaf_deps, "tabpfn>=2.0.0")
+    .add_local_python_source("sheaf")
 )
 
 # Whisper — needs torch; WAV inputs are decoded in pure Python (no ffmpeg needed)
-_audio_image = modal.Image.debian_slim(python_version="3.11").pip_install(
-    "sheaf-serve",
-    "openai-whisper>=20240930",
-    "torch>=2.1,<2.5",
+_audio_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install(*_sheaf_deps, "openai-whisper>=20240930", "torch>=2.1,<2.5")
+    .add_local_python_source("sheaf")
 )
 
 # ---------------------------------------------------------------------------
