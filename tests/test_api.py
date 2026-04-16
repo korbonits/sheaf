@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from sheaf.api.time_series import Frequency, OutputMode, TimeSeriesRequest
+from sheaf.api.time_series import FeatureRef, Frequency, OutputMode, TimeSeriesRequest
 
 
 def test_time_series_request_with_raw_history():
@@ -19,15 +19,39 @@ def test_time_series_request_with_raw_history():
 
 
 def test_time_series_request_with_feature_ref():
+    ref = FeatureRef(
+        feature_view="asset_prices",
+        feature_name="close_history_30d",
+        entity_key="ticker",
+        entity_value="AAPL",
+    )
     req = TimeSeriesRequest(
         model_name="chronos2-small",
-        feature_ref={"feature_view": "asset_prices", "entity_id": "AAPL"},
+        feature_ref=ref,
         horizon=24,
         frequency=Frequency.DAILY,
         output_mode=OutputMode.QUANTILES,
     )
     assert req.history is None
+    assert req.feature_ref == ref
     assert req.quantile_levels == [0.1, 0.5, 0.9]
+
+
+def test_time_series_request_feature_ref_accepts_dict():
+    """feature_ref can be passed as a plain dict — Pydantic coerces it."""
+    req = TimeSeriesRequest(
+        model_name="chronos2-small",
+        feature_ref={
+            "feature_view": "asset_prices",
+            "feature_name": "close_history_30d",
+            "entity_key": "ticker",
+            "entity_value": "AAPL",
+        },
+        horizon=24,
+        frequency=Frequency.DAILY,
+    )
+    assert isinstance(req.feature_ref, FeatureRef)
+    assert req.feature_ref.entity_value == "AAPL"
 
 
 def test_time_series_request_requires_input_source():
@@ -44,7 +68,12 @@ def test_time_series_request_rejects_both_input_sources():
         TimeSeriesRequest(
             model_name="chronos2-small",
             history=[1.0, 2.0, 3.0],
-            feature_ref={"feature_view": "asset_prices", "entity_id": "AAPL"},
+            feature_ref=FeatureRef(
+                feature_view="asset_prices",
+                feature_name="close_history_30d",
+                entity_key="ticker",
+                entity_value="AAPL",
+            ),
             horizon=12,
             frequency=Frequency.HOURLY,
         )

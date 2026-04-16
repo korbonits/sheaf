@@ -147,6 +147,19 @@ class _SheafDeployment:
         self._backend.load()
         self._spec = spec
 
+        # Feast resolver — only initialised when the spec provides a repo path.
+        self._feast: Any = None
+        if spec.feast_repo_path:
+            from sheaf.integrations.feast import FeastResolver
+
+            self._feast = FeastResolver(spec.feast_repo_path)
+            self._feast.load()
+            _logger.info(
+                "Feast resolver loaded for '%s' (repo: %s)",
+                spec.name,
+                spec.feast_repo_path,
+            )
+
         # Wire BatchPolicy into the @serve.batch handler.
         # set_max_batch_size / set_batch_wait_timeout_s are the official Ray
         # Serve API for runtime batch parameter updates (see serve.batch docs).
@@ -182,6 +195,12 @@ class _SheafDeployment:
         Requests are automatically batched by the @serve.batch handler
         below — concurrent calls are grouped up to max_batch_size or
         batch_wait_timeout_s, whichever comes first.
+
+        If the request carries a ``feature_ref``, the Feast resolver fetches
+        the online feature and replaces ``feature_ref`` with the resolved
+        ``history`` before the request reaches the batching layer.  Resolution
+        is per-request (not per-batch) because each request may reference a
+        different entity.
         """
         if request.model_type != self._spec.model_type:
             raise HTTPException(
@@ -192,6 +211,33 @@ class _SheafDeployment:
                     f"got '{request.model_type}'"
                 ),
             )
+
+        # Feast feature resolution — runs before batching so each entity
+        # is looked up independently and the backend always sees `history`.
+        _feature_ref = getattr(request, "feature_ref", None)
+        if _feature_ref is not None:
+            if self._feast is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Request contains feature_ref but ModelSpec "
+                        f"'{self._spec.name}' has no feast_repo_path configured."
+                    ),
+                )
+            try:
+                history = self._feast.resolve(_feature_ref)
+            except Exception as exc:
+                _logger.exception(
+                    "Feast resolution error in deployment '%s'", self._spec.name
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Feast resolution failed: {type(exc).__name__}: {exc}",
+                ) from exc
+            request = request.model_copy(
+                update={"history": history, "feature_ref": None}
+            )
+
         try:
             return await self._batch_predict(request)  # type: ignore[return-value]
         except Exception as exc:

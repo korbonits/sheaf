@@ -135,8 +135,10 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
 
     from sheaf.registry import _BACKEND_REGISTRY
 
-    # Load all backends once — they stay in memory for the container's lifetime.
-    _backends: dict[str, tuple[ModelSpec, Any]] = {}
+    # Load all backends (and optional Feast resolvers) once — they stay in
+    # memory for the container's lifetime.
+    # _backends maps name → (spec, backend, feast_resolver | None)
+    _backends: dict[str, tuple[ModelSpec, Any, Any]] = {}
     for spec in specs:
         backend_cls = spec.backend_cls or _BACKEND_REGISTRY.get(spec.backend)
         if backend_cls is None:
@@ -146,7 +148,20 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
             )
         backend = backend_cls(**spec.backend_kwargs)
         backend.load()
-        _backends[spec.name] = (spec, backend)
+
+        feast = None
+        if spec.feast_repo_path:
+            from sheaf.integrations.feast import FeastResolver
+
+            feast = FeastResolver(spec.feast_repo_path)
+            feast.load()
+            _logger.info(
+                "Feast resolver loaded for '%s' (repo: %s)",
+                spec.name,
+                spec.feast_repo_path,
+            )
+
+        _backends[spec.name] = (spec, backend, feast)
         _logger.info("Loaded backend '%s' (%s)", spec.name, spec.backend)
 
     asgi_app = FastAPI(title="Sheaf")
@@ -161,14 +176,14 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
     def ready(name: str) -> dict[str, str]:
         if name not in _backends:
             raise HTTPException(status_code=404, detail=f"No deployment named '{name}'")
-        spec, _ = _backends[name]
+        spec, _, _feast = _backends[name]
         return {"status": "ready", "model": spec.name}
 
     @asgi_app.post("/{name}/predict")
     async def predict(name: str, request: AnyRequest) -> dict[str, Any]:  # type: ignore[valid-type]
         if name not in _backends:
             raise HTTPException(status_code=404, detail=f"No deployment named '{name}'")
-        spec, backend = _backends[name]
+        spec, backend, feast = _backends[name]
         if request.model_type != spec.model_type:
             raise HTTPException(
                 status_code=422,
@@ -177,6 +192,30 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                     f"got '{request.model_type}'"
                 ),
             )
+
+        # Feast feature resolution — per-request, before inference.
+        _feature_ref = getattr(request, "feature_ref", None)
+        if _feature_ref is not None:
+            if feast is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Request contains feature_ref but ModelSpec '{name}' "
+                        "has no feast_repo_path configured."
+                    ),
+                )
+            try:
+                history = feast.resolve(_feature_ref)
+            except Exception as exc:
+                _logger.exception("Feast resolution error in deployment '%s'", name)
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Feast resolution failed: {type(exc).__name__}: {exc}",
+                ) from exc
+            request = request.model_copy(
+                update={"history": history, "feature_ref": None}
+            )
+
         try:
             result = await backend.async_predict(request)
             return result.model_dump(mode="json")

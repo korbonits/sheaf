@@ -53,3 +53,11 @@ class ModelSpec(BaseModel):
     backend_kwargs: dict = Field(default_factory=dict)
     resources: ResourceConfig = Field(default_factory=ResourceConfig)
     batch_policy: BatchPolicy = Field(default_factory=BatchPolicy)
+    feast_repo_path: str | None = Field(
+        default=None,
+        description=(
+            "Path to a Feast feature repo directory (contains feature_store.yaml). "
+            "When set, TimeSeriesRequests that specify feature_ref will have their "
+            "history resolved from the online store before inference."
+        ),
+    )

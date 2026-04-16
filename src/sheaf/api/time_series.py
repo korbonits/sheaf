@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal, cast
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 
@@ -24,11 +24,41 @@ class OutputMode(StrEnum):
     SAMPLES = "samples"
 
 
+class FeatureRef(BaseModel):
+    """Reference to a Feast online feature used as model input history.
+
+    The referenced feature must store the complete input sequence as a
+    ``list[float]`` (or ``list[list[float]]`` for multivariate history).
+    ``FeastResolver`` calls ``get_online_features`` with these parameters and
+    returns the resolved list as the ``history`` field for the backend.
+
+    Example::
+
+        feature_ref=FeatureRef(
+            feature_view="asset_prices",
+            feature_name="close_history_30d",
+            entity_key="ticker",
+            entity_value="AAPL",
+        )
+    """
+
+    feature_view: str = Field(description="Feast feature view name")
+    feature_name: str = Field(
+        description="Feature column within the view; must return list[float]"
+    )
+    entity_key: str = Field(
+        description="Entity join key (column name defined in the feature view)"
+    )
+    entity_value: str = Field(description="Entity value to look up, e.g. 'AAPL'")
+
+
 class TimeSeriesRequest(BaseRequest):
     """Request contract for time series foundation models.
 
-    Either `history` (raw values) or `feature_ref` (Feast entity reference)
-    must be provided, not both.
+    Either ``history`` (raw values) or ``feature_ref`` (Feast entity reference)
+    must be provided, not both.  When ``feature_ref`` is given, the serving
+    layer resolves it via ``FeastResolver`` before passing the request to the
+    backend — the backend always sees ``history`` populated.
 
     Univariate:   history=[1.0, 2.0, 3.0, ...]
     Multivariate: history=[[1.0, 10.0], [2.0, 11.0], ...]  (shape: [time, variates])
@@ -37,10 +67,9 @@ class TimeSeriesRequest(BaseRequest):
 
     model_type: Literal[ModelType.TIME_SERIES] = ModelType.TIME_SERIES
 
-    # Input: raw history or feature store reference
+    # Input: raw history or feature store reference (mutually exclusive)
     history: Annotated[list[float] | list[list[float]] | None, Field(default=None)]
-    feature_ref: Annotated[dict[str, str] | None, Field(default=None)]
-    # e.g. {"feature_view": "asset_prices", "entity_id": "AAPL"}
+    feature_ref: Annotated[FeatureRef | None, Field(default=None)]
 
     # Multivariate: index of the variate to forecast (0-based)
     target_index: int = Field(
