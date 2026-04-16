@@ -219,7 +219,7 @@ uv run ruff format --check src/ tests/ # format check (use without --check to fi
 uv run ty check src/                  # type check
 ```
 
-CI runs lint + tests on Python 3.10, 3.11, 3.12 via GitHub Actions.
+CI runs lint + tests on Python 3.11, 3.12 via GitHub Actions.
 
 ## TabPFN requirement
 
@@ -230,4 +230,3 @@ CI runs lint + tests on Python 3.10, 3.11, 3.12 via GitHub Actions.
 - Sphinx / mkdocs: deferred until the API surface stabilizes further
 - `bucket_by` batching: `BatchPolicy.bucket_by` field exists but grouping requests by horizon (or other field) before batching is not yet implemented
 - `BatchPolicy` via `ModelServer.run()`: batch parameters are wired in `__init__` via setters; there is no separate `.options()` API for this in Ray Serve
-- PyPI republish: current PyPI package is v0.1.0; `examples/quickstart_modal.py` uses `add_local_python_source("sheaf")` as a workaround until a new release is cut
