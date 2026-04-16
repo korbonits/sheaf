@@ -52,7 +52,7 @@ vision = [
     "sam2>=1.0",
 ]
 molecular = [
-    "fair-esm>=2.0.0",
+    "esm>=3.0.0",  # EvolutionaryScale ESM-3; requires Python 3.12+
 ]
 feast = [
     "feast>=0.40.0",
