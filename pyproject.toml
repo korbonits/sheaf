@@ -7,7 +7,7 @@ name = "sheaf-serve"
 version = "0.1.0"
 description = "Unified serving layer for non-text foundation models"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Alex Korbonits", email = "alexkorbonits@gmail.com" }]
 keywords = ["serving", "inference", "foundation-models", "ray", "mlops"]
@@ -16,7 +16,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -56,10 +55,12 @@ vision = [
     "sam2>=1.0",
 ]
 molecular = [
-    "esm>=3.0.0",  # EvolutionaryScale ESM-3; requires Python 3.12+
+    # ESM-3 requires Python 3.12+; marker prevents resolution errors on 3.11
+    "esm>=3.0.0 ; python_full_version >= '3.12'",
 ]
 weather = [
-    "graphcast>=0.1.0",  # google-deepmind/graphcast; also needs dm-haiku and jax
+    # graphcast 1.0.0 requires Python 3.11 only; pin <1.0.0 for 3.11 + 3.12 support
+    "graphcast>=0.1.0,<1.0.0",
     "dm-haiku>=0.0.12",
     "jax>=0.4.25",
     "xarray>=2024.1.0",
@@ -94,7 +95,11 @@ dev = [
     "pre-commit>=3.7.0",
 ]
 all = [
-    "sheaf-serve[time-series,tabular,moirai,audio,tts,vision,molecular,feast,milvus]",
+    # Excludes extras with narrow Python constraints or cross-extra conflicts:
+    #   moirai:    uni2ts pins hydra-core==1.3; sam2 (vision) needs >=1.3.2
+    #   molecular: esm requires Python 3.12+
+    #   weather:   graphcast requires Python 3.11 only
+    "sheaf-serve[time-series,tabular,audio,audio-generation,tts,vision,genomics,small-molecule,materials,earth-observation,feast,milvus]",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -108,13 +113,21 @@ src = ["src"]
 select = ["E", "F", "I", "UP"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 files = ["src/sheaf"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.uv]
+# uni2ts (moirai) pins hydra-core==1.3; sam2 (vision) requires hydra-core>=1.3.2.
+# [all] includes vision, so it also conflicts with moirai.
+conflicts = [
+    [{ extra = "moirai" }, { extra = "vision" }],
+    [{ extra = "moirai" }, { extra = "all" }],
+]
 
 [tool.uv.sources]
 chronos-forecasting = { git = "https://github.com/amazon-science/chronos-forecasting.git" }
