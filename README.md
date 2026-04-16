@@ -180,15 +180,18 @@ See [`examples/`](examples/) for time series comparison, tabular, audio, vision,
 - [x] FLUX diffusion / image generation
 - [x] VideoMAE / TimeSformer video understanding
 
-**v0.5 — serving quality + new modalities**
+**v0.5 — observability + new modalities**
+
+Ops / DX:
+- [x] PyPI publish (v0.4.0)
+- [ ] Prometheus metrics endpoint per deployment
+- [ ] OpenTelemetry traces through the request path
+- [ ] Structured logging with request IDs end-to-end
 
 Serving / infra:
 - [ ] Streaming responses (token-by-token latency for diffusion and TTS)
 - [ ] Request caching (`cache/` layer — currently a stub)
 - [ ] `bucket_by` batching — group requests by horizon/length before `@serve.batch`
-- [ ] Prometheus metrics endpoint per deployment
-- [ ] OpenTelemetry traces through the request path
-- [ ] Structured logging with request IDs end-to-end
 
 New model types:
 - [ ] LiDAR / 3D point cloud (PointNet++, OpenShape)
