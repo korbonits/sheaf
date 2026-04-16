@@ -67,6 +67,7 @@ examples/
   quickstart_tabular.py
   time_series_comparison.py  # Chronos vs TimesFM
   quickstart_audio.py        # Whisper + faster-whisper transcription, word timestamps, translation
+  quickstart_vision.py       # DINOv2 + OpenCLIP image embeddings, CLS vs mean pooling, cross-modal retrieval
   sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
