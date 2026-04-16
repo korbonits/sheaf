@@ -38,6 +38,7 @@ PyPI: `pip install sheaf-serve`
 - Materials science: MACE backend (`mace-torch`) — universal interatomic potential via MACE-MP-0; energy, forces, and optional stress via ASE `Atoms` interface; install with `pip install 'sheaf-serve[materials]'`
 - Weather forecasting: GraphCast backend (`graphcast`, `dm-haiku`, `jax`, `xarray`) — autoregressive n-step rollout from ERA5 surface+atmospheric fields; checkpoint loaded from `.npz`; install with `pip install 'sheaf-serve[weather]'`
 - Earth observation: Prithvi backend (`transformers`, `torch`) — IBM/NASA Prithvi-EO geospatial embeddings via `AutoModel` + `AutoImageProcessor` with `trust_remote_code=True`; `SatelliteRequest` accepts `(n_time, n_bands, H, W)` float32 pixels; per-band z-score normalization; CLS and mean pooling; install with `pip install 'sheaf-serve[earth-observation]'`
+- Cross-modal embeddings: ImageBind backend — five modalities (text, vision, audio, depth, thermal) in a shared 1024-dim embedding space; `MultimodalEmbeddingRequest` accepts exactly one modality field; image/audio inputs written to named temp files (imagebind loaders require file paths); imagebind not on PyPI: `pip install git+https://github.com/facebookresearch/ImageBind.git` then `pip install 'sheaf-serve[multimodal]'`
 - TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` + `predict()` against the live library; 8 tests in `test_tabpfn_integration.py`
 - Ray Serve smoke coverage: all modalities have end-to-end smoke tests in `test_smoke_ray.py`
 
@@ -63,6 +64,7 @@ src/sheaf/
     audio.py           # AudioRequest/Response, TTSRequest/TTSResponse
     audio_generation.py # AudioGenerationRequest/Response (MusicGen)
     embedding.py       # EmbeddingRequest/Response
+    multimodal_embedding.py  # MultimodalEmbeddingRequest/Response (ImageBind)
     segmentation.py    # SegmentationRequest/Response
     depth.py           # DepthRequest/Response
     detection.py       # DetectionRequest/Response
@@ -93,6 +95,7 @@ src/sheaf/
     mace.py            # MACEBackend — MACE-MP-0 universal interatomic potential via ASE
     graphcast.py       # GraphCastBackend — weather forecasting via google-deepmind/graphcast (JAX/Haiku)
     prithvi.py         # PrithviBackend — IBM/NASA Prithvi-EO geospatial embeddings (trust_remote_code=True)
+    imagebind.py       # ImageBindBackend — cross-modal embeddings (text/vision/audio/depth/thermal); imagebind not on PyPI
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
@@ -125,6 +128,7 @@ tests/
   test_mace_backend.py                 # MACEBackend mocked tests (13 tests)
   test_graphcast_backend.py            # GraphCastBackend mocked tests (16 tests)
   test_prithvi_backend.py              # PrithviBackend mocked tests (14 tests)
+  test_imagebind_backend.py            # ImageBindBackend mocked tests (20 tests)
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
@@ -176,6 +180,10 @@ tests/
 - **Prithvi normalization** — `_normalize()` broadcasts processor `image_mean`/`image_std` over `(n_time, n_bands, H, W)` axis=1. Skips silently if processor lacks those attrs (`AttributeError`/`TypeError`) or if band count mismatches.
 - **GraphCast checkpoint** — `GraphCastBackend.load()` opens `checkpoint_path` with `pickle.load` (the `.npz` checkpoint is actually a pickle). Haiku `transform_with_state` is JIT-compiled at load time; tests patch `builtins.open` with `mock_open()` to avoid FileNotFoundError.
 - **SatelliteRequest pixels layout** — `pixels_b64` encodes a `(n_time, n_bands, H, W)` float32 array. `PrithviBackend` decodes, optionally normalizes, then unsqueezes to `(1, n_time, n_bands, H, W)` before the model call.
+- **ImageBind not on PyPI** — `imagebind-packaged` pins `torch==1.13.0` (2022) and is incompatible with any modern ML stack. Install from source: `pip install git+https://github.com/facebookresearch/ImageBind.git`. The `[multimodal]` extra provides `torch>=2.0.0` and `torchvision`/`torchaudio`. A clear `ImportError` is raised at `load()` time with installation instructions.
+- **ImageBind temp files** — imagebind data loaders accept file paths, not in-memory buffers. `ImageBindBackend._build_inputs()` writes base64-decoded bytes to `tempfile.mkstemp()` files and passes the paths to loaders. `_remove_files()` is called in a `finally` block after inference, so cleanup happens even on exceptions.
+- **ImageBind modality exclusivity** — `MultimodalEmbeddingRequest` accepts exactly one of: `texts`, `images_b64`, `audios_b64`, `depth_images_b64`, `thermal_images_b64`. Validated by `@model_validator`. A single request batches all items within a modality.
+- **ImageBind MagicMock side_effect pattern** — in tests, `model.side_effect = _forward` (not `model.__call__ = ...`) is the correct way to override MagicMock call behavior. Python looks up special methods on the type, not the instance — setting `__call__` on a MagicMock instance has no effect.
 
 ## Adding a new backend
 
