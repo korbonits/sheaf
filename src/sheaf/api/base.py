@@ -1,13 +1,13 @@
 """Base request/response contracts and model type registry."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 
-class ModelType(str, Enum):
+class ModelType(StrEnum):
     TIME_SERIES = "time_series"
     TABULAR = "tabular"
     MOLECULAR = "molecular"

@@ -1,6 +1,6 @@
 """API contract for time series foundation models (Chronos2, TimesFM, etc.)."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal, cast
 
 from pydantic import Field, model_validator
@@ -8,7 +8,7 @@ from pydantic import Field, model_validator
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 
 
-class Frequency(str, Enum):
+class Frequency(StrEnum):
     MINUTELY = "1min"
     FIVE_MINUTELY = "5min"
     FIFTEEN_MINUTELY = "15min"
@@ -18,7 +18,7 @@ class Frequency(str, Enum):
     MONTHLY = "1M"
 
 
-class OutputMode(str, Enum):
+class OutputMode(StrEnum):
     MEAN = "mean"
     QUANTILES = "quantiles"
     SAMPLES = "samples"
