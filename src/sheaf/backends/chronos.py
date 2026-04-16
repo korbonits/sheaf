@@ -101,9 +101,9 @@ class Chronos2Backend(ModelBackend):
         if self._pipeline is None:
             raise RuntimeError("Backend not loaded. Call load() first.")
 
-        # Build context — list of tensors (handles variable-length history)
+        # Build context tensors (handles variable-length and multivariate history)
         contexts = [
-            torch.tensor(r.history or [], dtype=torch.float32) for r in requests
+            torch.tensor(r.target_history, dtype=torch.float32) for r in requests
         ]
         horizon = requests[0].horizon
 

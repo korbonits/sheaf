@@ -116,7 +116,7 @@ class TimesFMBackend(ModelBackend):
                     f"Reinitialize with a larger horizon_len."
                 )
 
-        contexts = [np.array(r.history or [], dtype=np.float32) for r in requests]
+        contexts = [np.array(r.target_history, dtype=np.float32) for r in requests]
         freqs = [_FREQ_MAP.get(requests[0].frequency, 0)] * len(requests)
 
         # point: [batch, horizon_len]
