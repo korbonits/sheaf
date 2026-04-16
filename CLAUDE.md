@@ -27,6 +27,12 @@ PyPI: `pip install sheaf-serve`
 - Audio: Whisper backend (`openai-whisper`) and faster-whisper backend (`faster-whisper` / CTranslate2) — transcription, translation, word timestamps, VAD filter, language probability; WAV decoded inline (no ffmpeg needed for WAV inputs); install with `pip install 'sheaf-serve[audio]'`
 - TTS: Bark backend (`suno/bark-small`, `suno/bark`) via HuggingFace `transformers.BarkModel` — text-to-speech with optional voice presets; outputs base64-encoded 16-bit PCM WAV at 24kHz; install with `pip install 'sheaf-serve[tts]'`
 - Vision embeddings: OpenCLIP backend (`open-clip-torch`) — image and text embeddings via CLIP/SigLIP/EVA-CLIP; `EmbeddingRequest` accepts `texts` or `images_b64` (mutually exclusive); L2-normalized by default; install with `pip install 'sheaf-serve[vision]'`
+- Vision embeddings: DINOv2 backend (`transformers`) — image-only CLS or mean-pooled embeddings; install with `pip install 'sheaf-serve[vision]'`
+- Segmentation: SAM2 backend (`sam2`) — prompted image segmentation via point coords, labels, and/or bounding boxes; returns base64-encoded uint8 masks; install with `pip install 'sheaf-serve[vision]'`
+- Depth estimation: Depth Anything v2 backend (`transformers`) — monocular depth estimation; returns base64-encoded float32 depth map + min/max; install with `pip install 'sheaf-serve[vision]'`
+- Object detection: DETR/RT-DETR backend (`transformers`) — any `AutoModelForObjectDetection`-compatible model; returns boxes in `[x1,y1,x2,y2]` pixel coords, class labels, scores; install with `pip install 'sheaf-serve[vision]'`
+- Molecular embeddings: ESM-3 backend (`esm>=3.0.0`) — protein sequence embeddings via EvolutionaryScale ESM-3; CLS or mean pooling; **Python 3.12+ required**; install with `pip install 'sheaf-serve[molecular]'`
+- Ray Serve smoke coverage: all 8 modalities (time_series, tabular, audio, tts, embedding, segmentation, molecular, depth, detection) now have end-to-end smoke tests in `test_smoke_ray.py`
 
 **v0.3 remaining targets:**
 - GraphCast geospatial backend
@@ -56,6 +62,9 @@ src/sheaf/
     bark.py            # BarkBackend — Bark TTS via HuggingFace transformers
     open_clip.py       # OpenCLIPBackend — image/text embeddings via open-clip-torch
     dinov2.py          # DINOv2Backend — image-only embeddings via HuggingFace transformers (CLS or mean pooling)
+    sam2.py            # SAM2Backend — prompted image segmentation via sam2 library
+    depth_anything.py  # DepthAnythingBackend — monocular depth estimation via transformers
+    detr.py            # DETRBackend — object detection via DETR/RT-DETR (AutoModelForObjectDetection)
     esm3.py            # ESM3Backend — protein sequence embeddings via EvolutionaryScale esm (Python 3.12+)
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
@@ -79,9 +88,11 @@ tests/
   test_bark_backend.py            # BarkBackend mocked tests (9 tests)
   test_open_clip_backend.py       # OpenCLIPBackend mocked tests (12 tests)
   test_dinov2_backend.py          # DINOv2Backend mocked tests (10 tests)
-  test_esm3_backend.py            # ESM3Backend mocked tests (10 tests)
   test_sam2_backend.py            # SAM2Backend mocked tests (11 tests)
-  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run)
+  test_depth_anything_backend.py  # DepthAnythingBackend mocked tests (10 tests)
+  test_detr_backend.py            # DETRBackend mocked tests (11 tests)
+  test_esm3_backend.py            # ESM3Backend mocked tests (10 tests)
+  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all 9 modalities
   test_smoke_whisper.py           # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
 ```
 
@@ -120,6 +131,9 @@ tests/
 - **DINOv2 pooling strategies** — `DINOv2Backend` supports `pooling="cls"` (CLS token at `last_hidden_state[:, 0, :]`, default) and `pooling="mean"` (mean of patch tokens at `[:, 1:, :]`). Image-only; raises `ValueError` on `texts` input.
 - **ESM-3 pooling strategies** — `ESM3Backend` supports `pooling="mean"` (mean of residue hidden states at positions `1:-1`, excluding BOS/EOS, default) and `pooling="cls"` (BOS token at position 0). Requires Python 3.12+ and HuggingFace Hub login with EvolutionaryScale license accepted.
 - **SAM2 mask encoding** — `SegmentationResponse.masks_b64` are base64-encoded flat uint8 byte arrays. Decode with `np.frombuffer(base64.b64decode(m), dtype=np.uint8).reshape(height, width).astype(bool)`.
+- **Depth Anything normalization** — `DepthRequest.normalize=True` (default) maps raw depth to `[0, 1]` via `(d - min) / range`. `DepthResponse.depth_b64` is a base64-encoded flat float32 byte array; reshape with `np.frombuffer(..., dtype=np.float32).reshape(height, width)`.
+- **DETR target_sizes ordering** — PIL `.size` returns `(W, H)` but `post_process_object_detection` requires `target_sizes=[(H, W)]`. The backend unpacks as `img_width, img_height = img.size` and reverses for the call.
+- **`_real_import` pattern in tests** — when patching `builtins.__import__` to block a specific module, capture `_real_import = builtins.__import__` first and delegate all non-blocked imports to it. Avoids infinite recursion when the backend's `load()` does `from PIL import Image` (which re-enters `__import__`). Inject any needed mocks via `sys.modules` instead of relying on `__import__` for them.
 
 ## Adding a new backend
 
