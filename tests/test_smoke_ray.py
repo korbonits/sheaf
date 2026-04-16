@@ -92,132 +92,132 @@ def urls():
         model_type=ModelType.TIME_SERIES,
         backend="_smoke_ts",
         backend_cls=SmokeTimeSeriesBackend,  # cloudpickled to worker
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     reg_spec = ModelSpec(
         name="smoke-registry",
         model_type=ModelType.TIME_SERIES,
         backend="_smoke_ts_registry",  # string lookup — no backend_cls
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     err_spec = ModelSpec(
         name="smoke-error",
         model_type=ModelType.TIME_SERIES,
         backend="_smoke_error",
         backend_cls=ErrorTimeSeriesBackend,  # cloudpickled to worker
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     emb_spec = ModelSpec(
         name="smoke-embedding",
         model_type=ModelType.EMBEDDING,
         backend="_smoke_embedding",
         backend_cls=SmokeEmbeddingBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     seg_spec = ModelSpec(
         name="smoke-segmentation",
         model_type=ModelType.SEGMENTATION,
         backend="_smoke_segmentation",
         backend_cls=SmokeSegmentationBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     mol_spec = ModelSpec(
         name="smoke-molecular",
         model_type=ModelType.MOLECULAR,
         backend="_smoke_molecular",
         backend_cls=SmokeMolecularBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     depth_spec = ModelSpec(
         name="smoke-depth",
         model_type=ModelType.DEPTH,
         backend="_smoke_depth",
         backend_cls=SmokeDepthBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     det_spec = ModelSpec(
         name="smoke-detection",
         model_type=ModelType.DETECTION,
         backend="_smoke_detection",
         backend_cls=SmokeDetectionBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     weather_spec = ModelSpec(
         name="smoke-weather",
         model_type=ModelType.WEATHER,
         backend="_smoke_weather",
         backend_cls=SmokeWeatherBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     satellite_spec = ModelSpec(
         name="smoke-satellite",
         model_type=ModelType.GEOSPATIAL,
         backend="_smoke_satellite",
         backend_cls=SmokeSatelliteBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     genomic_spec = ModelSpec(
         name="smoke-genomic",
         model_type=ModelType.GENOMIC,
         backend="_smoke_genomic",
         backend_cls=SmokeGenomicBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     materials_spec = ModelSpec(
         name="smoke-materials",
         model_type=ModelType.MATERIALS,
         backend="_smoke_materials",
         backend_cls=SmokeMaterialsBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     small_mol_spec = ModelSpec(
         name="smoke-small-molecule",
         model_type=ModelType.SMALL_MOLECULE,
         backend="_smoke_small_molecule",
         backend_cls=SmokeSmallMoleculeBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     audio_gen_spec = ModelSpec(
         name="smoke-audio-generation",
         model_type=ModelType.AUDIO_GENERATION,
         backend="_smoke_audio_generation",
         backend_cls=SmokeAudioGenerationBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     multimodal_spec = ModelSpec(
         name="smoke-multimodal",
         model_type=ModelType.MULTIMODAL_EMBEDDING,
         backend="_smoke_multimodal",
         backend_cls=SmokeMultimodalEmbeddingBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     tabular_spec = ModelSpec(
         name="smoke-tabular",
         model_type=ModelType.TABULAR,
         backend="_smoke_tabular",
         backend_cls=SmokeTabularBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     tts_spec = ModelSpec(
         name="smoke-tts",
         model_type=ModelType.TTS,
         backend="_smoke_tts",
         backend_cls=SmokeTTSBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     diffusion_spec = ModelSpec(
         name="smoke-diffusion",
         model_type=ModelType.DIFFUSION,
         backend="_smoke_diffusion",
         backend_cls=SmokeDiffusionBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     video_spec = ModelSpec(
         name="smoke-video",
         model_type=ModelType.VIDEO,
         backend="_smoke_video",
         backend_cls=SmokeVideoBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
 
     server = ModelServer(
@@ -891,7 +891,7 @@ def test_hot_swap(serving_url: str, model_server) -> None:  # type: ignore[type-
         model_type=ModelType.TIME_SERIES,
         backend="_smoke_ts_registry",
         backend_cls=SmokeTimeSeriesRegistryBackend,
-        resources=ResourceConfig(num_cpus=1, replicas=1),
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
     model_server.update(new_spec)
 
