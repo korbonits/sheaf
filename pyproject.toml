@@ -68,6 +68,9 @@ genomics = [
     "transformers>=4.37.0",  # Nucleotide Transformer via AutoModel + AutoTokenizer
     "torch>=2.0.0",
 ]
+materials = [
+    "mace-torch>=0.3.0",  # MACE-MP-0 universal interatomic potential; brings torch + ase
+]
 feast = [
     "feast>=0.40.0",
 ]

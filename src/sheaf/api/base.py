@@ -12,6 +12,7 @@ class ModelType(str, Enum):
     TABULAR = "tabular"
     MOLECULAR = "molecular"
     GENOMIC = "genomic"
+    MATERIALS = "materials"
     GEOSPATIAL = "geospatial"
     WEATHER = "weather"
     DIFFUSION = "diffusion"

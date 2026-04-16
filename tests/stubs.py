@@ -15,6 +15,7 @@ from sheaf.api.depth import DepthRequest, DepthResponse
 from sheaf.api.detection import DetectionRequest, DetectionResponse
 from sheaf.api.embedding import EmbeddingRequest, EmbeddingResponse
 from sheaf.api.genomic import GenomicRequest, GenomicResponse
+from sheaf.api.materials import MaterialsRequest, MaterialsResponse
 from sheaf.api.molecular import MolecularRequest, MolecularResponse
 from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
@@ -300,4 +301,30 @@ class SmokeGenomicBackend(ModelBackend):
             model_name=request.model_name,
             embeddings=[[0.0, 0.0, 0.0, 0.0]] * n,
             dim=4,
+        )
+
+
+@register_backend("_smoke_materials")
+class SmokeMaterialsBackend(ModelBackend):
+    """Returns fixed energy=-42.0 eV and zero forces for any structure."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.MATERIALS
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, MaterialsRequest)
+        n = len(request.atomic_numbers)
+        forces_b64 = base64.b64encode(
+            np.zeros((n, 3), dtype=np.float32).tobytes()
+        ).decode()
+        return MaterialsResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            energy=-42.0,
+            forces_b64=forces_b64,
+            n_atoms=n,
         )

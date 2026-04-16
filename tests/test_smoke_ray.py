@@ -27,6 +27,7 @@ from tests.stubs import (
     SmokeDetectionBackend,
     SmokeEmbeddingBackend,
     SmokeGenomicBackend,
+    SmokeMaterialsBackend,
     SmokeMolecularBackend,
     SmokeSatelliteBackend,
     SmokeSegmentationBackend,
@@ -155,6 +156,13 @@ def urls():
         backend_cls=SmokeGenomicBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    materials_spec = ModelSpec(
+        name="smoke-materials",
+        model_type=ModelType.MATERIALS,
+        backend="_smoke_materials",
+        backend_cls=SmokeMaterialsBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -169,6 +177,7 @@ def urls():
             weather_spec,
             satellite_spec,
             genomic_spec,
+            materials_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -191,6 +200,7 @@ def urls():
         ("smoke-weather", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather"),
         ("smoke-satellite", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite"),
         ("smoke-genomic", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-genomic"),
+        ("smoke-materials", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-materials"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -217,6 +227,7 @@ def urls():
         "weather": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather",
         "satellite": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-satellite",
         "genomic": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-genomic",
+        "materials": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-materials",
         "server": server,
     }
 
@@ -551,6 +562,36 @@ def test_weather_predict(urls: dict) -> None:
     assert body["forecast_times"][1] == "2023-01-02T00:00:00"
     assert "2m_temperature" in body["surface_forecasts"][0]
     assert "temperature" in body["atmospheric_forecasts"][0]
+
+
+def test_materials_predict(urls: dict) -> None:
+    """MaterialsRequest routes correctly; energy + forces returned."""
+    import numpy as np
+
+    url = urls["materials"]
+    # CO2: C at origin, two O atoms at ±1.16 Å
+    atomic_numbers = [6, 8, 8]
+    positions = np.array(
+        [[0.0, 0.0, 0.0], [0.0, 0.0, 1.16], [0.0, 0.0, -1.16]], dtype=np.float32
+    )
+    positions_b64 = base64.b64encode(positions.tobytes()).decode()
+
+    payload = {
+        "model_type": "materials",
+        "model_name": "smoke-materials",
+        "atomic_numbers": atomic_numbers,
+        "positions_b64": positions_b64,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["n_atoms"] == 3
+    assert body["energy"] == pytest.approx(-42.0)
+    assert body["forces_b64"] is not None
+    forces = np.frombuffer(
+        base64.b64decode(body["forces_b64"]), dtype=np.float32
+    ).reshape(3, 3)
+    assert forces.shape == (3, 3)
 
 
 def test_genomic_predict(urls: dict) -> None:
