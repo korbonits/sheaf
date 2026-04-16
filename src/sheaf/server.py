@@ -16,6 +16,7 @@ from ray import serve
 # These are side-effect-only imports; heavy deps (torch, etc.) are lazy inside load().
 # This ensures the registry is populated in Ray Serve worker processes.
 import sheaf.backends.chronos  # noqa: F401
+import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.tabpfn  # noqa: F401
 import sheaf.backends.timesfm  # noqa: F401
 from sheaf.api.base import BaseRequest
@@ -64,6 +65,7 @@ class _SheafDeployment:
         # loop here (guaranteed to see runtime_env env_vars), then look up from
         # the freshly-populated worker registry.
         import sheaf.backends.chronos  # noqa: F401
+        import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.tabpfn  # noqa: F401
         import sheaf.backends.timesfm  # noqa: F401
 
