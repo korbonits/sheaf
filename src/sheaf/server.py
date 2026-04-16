@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import logging
 import os
+import time
 from typing import Annotated, Any, cast
 
 import ray
@@ -151,9 +152,22 @@ class _SheafDeployment:
                 f"Unknown backend '{spec.backend}'. "
                 f"Registered backends: {list(_registry)}"
             )
+        if os.environ.get("SHEAF_LOG_JSON"):
+            from sheaf.logging import configure_logging
+
+            configure_logging()
+
         self._backend: ModelBackend = backend_cls(**spec.backend_kwargs)
         self._backend.load()
         self._spec = spec
+        _logger.info(
+            "backend loaded",
+            extra={
+                "deployment": spec.name,
+                "backend": spec.backend or type(self._backend).__name__,
+                "model_type": spec.model_type,
+            },
+        )
 
         # Feast resolver — only initialised when the spec provides a repo path.
         self._feast: Any = None
@@ -246,12 +260,24 @@ class _SheafDeployment:
                 update={"history": history, "feature_ref": None}
             )
 
+        _t0 = time.perf_counter()
+        _log_extra: dict[str, object] = {
+            "request_id": str(request.request_id),
+            "deployment": self._spec.name,
+            "model_type": request.model_type,
+            "model_name": request.model_name,
+        }
         try:
-            return await self._batch_predict(request)  # type: ignore[return-value]
+            result = await self._batch_predict(request)  # type: ignore[return-value]
+            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _log_extra["status"] = "ok"
+            _logger.info("predict ok", extra=_log_extra)
+            return result
         except Exception as exc:
-            # Log the full traceback server-side; expose only type + message
-            # to the client so internal details don't leak.
-            _logger.exception("Inference error in deployment '%s'", self._spec.name)
+            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _log_extra["status"] = "error"
+            _log_extra["error"] = f"{type(exc).__name__}: {exc}"
+            _logger.exception("predict error", extra=_log_extra)
             raise HTTPException(
                 status_code=500,
                 detail=f"{type(exc).__name__}: {exc}",
@@ -312,6 +338,11 @@ class ModelServer:
         return serve.run(deployment, name=spec.name, route_prefix=f"/{spec.name}")
 
     def run(self) -> None:
+        if os.environ.get("SHEAF_LOG_JSON"):
+            from sheaf.logging import configure_logging
+
+            configure_logging()
+
         if not ray.is_initialized():
             ray.init()
 

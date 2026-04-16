@@ -41,6 +41,7 @@ Notes:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Annotated, Any
 
 from pydantic import Field
@@ -168,7 +169,19 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
             )
 
         _backends[spec.name] = (spec, backend, feast)
-        _logger.info("Loaded backend '%s' (%s)", spec.name, spec.backend)
+        _logger.info(
+            "backend loaded",
+            extra={
+                "deployment": spec.name,
+                "backend": spec.backend or type(backend).__name__,
+                "model_type": spec.model_type,
+            },
+        )
+
+    if _os.environ.get("SHEAF_LOG_JSON"):
+        from sheaf.logging import configure_logging
+
+        configure_logging()
 
     asgi_app = FastAPI(title="Sheaf")
 
@@ -222,11 +235,24 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                 update={"history": history, "feature_ref": None}
             )
 
+        _t0 = time.perf_counter()
+        _log_extra: dict[str, object] = {
+            "request_id": str(request.request_id),
+            "deployment": name,
+            "model_type": request.model_type,
+            "model_name": request.model_name,
+        }
         try:
             result = await backend.async_predict(request)
+            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _log_extra["status"] = "ok"
+            _logger.info("predict ok", extra=_log_extra)
             return result.model_dump(mode="json")
         except Exception as exc:
-            _logger.exception("Inference error in deployment '%s'", name)
+            _log_extra["latency_ms"] = round((time.perf_counter() - _t0) * 1000, 2)
+            _log_extra["status"] = "error"
+            _log_extra["error"] = f"{type(exc).__name__}: {exc}"
+            _logger.exception("predict error", extra=_log_extra)
             raise HTTPException(
                 status_code=500,
                 detail=f"{type(exc).__name__}: {exc}",
