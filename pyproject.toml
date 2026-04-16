@@ -54,6 +54,12 @@ vision = [
 molecular = [
     "esm>=3.0.0",  # EvolutionaryScale ESM-3; requires Python 3.12+
 ]
+weather = [
+    "graphcast>=0.1.0",  # google-deepmind/graphcast; also needs dm-haiku and jax
+    "dm-haiku>=0.0.12",
+    "jax>=0.4.25",
+    "xarray>=2024.1.0",
+]
 feast = [
     "feast>=0.40.0",
 ]

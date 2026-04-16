@@ -12,6 +12,7 @@ class ModelType(str, Enum):
     TABULAR = "tabular"
     MOLECULAR = "molecular"
     GEOSPATIAL = "geospatial"
+    WEATHER = "weather"
     DIFFUSION = "diffusion"
     NEURAL_OPERATOR = "neural_operator"
     AUDIO = "audio"

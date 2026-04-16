@@ -29,6 +29,7 @@ from tests.stubs import (
     SmokeMolecularBackend,
     SmokeSegmentationBackend,
     SmokeTimeSeriesBackend,
+    SmokeWeatherBackend,
 )
 
 _FAKE_IMG_B64 = base64.b64encode(b"fake").decode()
@@ -131,6 +132,13 @@ def urls():
         backend_cls=SmokeDetectionBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    weather_spec = ModelSpec(
+        name="smoke-weather",
+        model_type=ModelType.WEATHER,
+        backend="_smoke_weather",
+        backend_cls=SmokeWeatherBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -142,6 +150,7 @@ def urls():
             mol_spec,
             depth_spec,
             det_spec,
+            weather_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -161,6 +170,7 @@ def urls():
         ("smoke-molecular", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-molecular"),
         ("smoke-depth", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-depth"),
         ("smoke-detection", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection"),
+        ("smoke-weather", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -184,6 +194,7 @@ def urls():
         "molecular": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-molecular",
         "depth": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-depth",
         "detection": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection",
+        "weather": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-weather",
         "server": server,
     }
 
@@ -445,6 +456,50 @@ def test_detection_predict(urls: dict) -> None:
     assert body["scores"] == pytest.approx([0.9])
     assert body["width"] == 640
     assert body["height"] == 480
+
+
+def test_weather_predict(urls: dict) -> None:
+    """WeatherRequest routes correctly; surface and atmospheric forecasts returned."""
+    import base64
+
+    import numpy as np
+
+    n_lat, n_lon, n_lev = 4, 8, 3
+    lat = [90.0, 60.0, 30.0, 0.0]
+    lon = [float(i * 45) for i in range(n_lon)]
+    levels = [1000, 500, 100]
+
+    def _enc(arr: np.ndarray) -> str:
+        return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+
+    zeros_surf = _enc(np.zeros((n_lat, n_lon), dtype=np.float32))
+    zeros_atmos = _enc(np.zeros((n_lev, n_lat, n_lon), dtype=np.float32))
+
+    url = urls["weather"]
+    payload = {
+        "model_type": "weather",
+        "model_name": "smoke-weather",
+        "surface_vars": {"2m_temperature": zeros_surf},
+        "atmospheric_vars": {"temperature": zeros_atmos},
+        "prev_surface_vars": {"2m_temperature": zeros_surf},
+        "prev_atmospheric_vars": {"temperature": zeros_atmos},
+        "lat": lat,
+        "lon": lon,
+        "pressure_levels": levels,
+        "current_time": "2023-01-01T12:00:00",
+        "n_steps": 2,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["n_steps"] == 2
+    assert body["step_hours"] == 6
+    assert len(body["surface_forecasts"]) == 2
+    assert len(body["atmospheric_forecasts"]) == 2
+    assert body["forecast_times"][0] == "2023-01-01T18:00:00"
+    assert body["forecast_times"][1] == "2023-01-02T00:00:00"
+    assert "2m_temperature" in body["surface_forecasts"][0]
+    assert "temperature" in body["atmospheric_forecasts"][0]
 
 
 def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:

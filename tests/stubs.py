@@ -17,6 +17,7 @@ from sheaf.api.embedding import EmbeddingRequest, EmbeddingResponse
 from sheaf.api.molecular import MolecularRequest, MolecularResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
 from sheaf.api.time_series import TimeSeriesRequest, TimeSeriesResponse
+from sheaf.api.weather import WeatherRequest, WeatherResponse
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import register_backend
 
@@ -203,4 +204,54 @@ class SmokeDetectionBackend(ModelBackend):
             labels=["cat"],
             width=640,
             height=480,
+        )
+
+
+@register_backend("_smoke_weather")
+class SmokeWeatherBackend(ModelBackend):
+    """Returns a single 6-hour forecast step with constant 0.0 fields."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.WEATHER
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, WeatherRequest)
+        n_lat, n_lon = len(request.lat), len(request.lon)
+        n_lev = len(request.pressure_levels)
+        zeros_surf = base64.b64encode(
+            np.zeros((n_lat, n_lon), dtype=np.float32).tobytes()
+        ).decode()
+        zeros_atmos = base64.b64encode(
+            np.zeros((n_lev, n_lat, n_lon), dtype=np.float32).tobytes()
+        ).decode()
+        from datetime import datetime, timedelta
+
+        current_dt = datetime.fromisoformat(request.current_time)
+        surface_forecasts = [
+            {k: zeros_surf for k in request.surface_vars}
+            for _ in range(request.n_steps)
+        ]
+        atmospheric_forecasts = [
+            {k: zeros_atmos for k in request.atmospheric_vars}
+            for _ in range(request.n_steps)
+        ]
+        forecast_times = [
+            (current_dt + timedelta(hours=6 * (i + 1))).isoformat()
+            for i in range(request.n_steps)
+        ]
+        return WeatherResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            surface_forecasts=surface_forecasts,
+            atmospheric_forecasts=atmospheric_forecasts,
+            lat=request.lat,
+            lon=request.lon,
+            pressure_levels=request.pressure_levels,
+            forecast_times=forecast_times,
+            step_hours=6,
+            n_steps=request.n_steps,
         )

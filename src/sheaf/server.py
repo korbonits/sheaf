@@ -22,6 +22,7 @@ import sheaf.backends.detr  # noqa: F401
 import sheaf.backends.dinov2  # noqa: F401
 import sheaf.backends.esm3  # noqa: F401
 import sheaf.backends.faster_whisper  # noqa: F401
+import sheaf.backends.graphcast  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.open_clip  # noqa: F401
 import sheaf.backends.sam2  # noqa: F401
@@ -37,6 +38,7 @@ from sheaf.api.molecular import MolecularRequest
 from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
+from sheaf.api.weather import WeatherRequest
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
 from sheaf.spec import ModelSpec
@@ -60,7 +62,8 @@ AnyRequest = Annotated[
     | SegmentationRequest
     | MolecularRequest
     | DepthRequest
-    | DetectionRequest,
+    | DetectionRequest
+    | WeatherRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -94,6 +97,7 @@ class _SheafDeployment:
         import sheaf.backends.dinov2  # noqa: F401
         import sheaf.backends.esm3  # noqa: F401
         import sheaf.backends.faster_whisper  # noqa: F401
+        import sheaf.backends.graphcast  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.open_clip  # noqa: F401
         import sheaf.backends.sam2  # noqa: F401
