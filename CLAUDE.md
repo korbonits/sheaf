@@ -56,6 +56,7 @@ src/sheaf/
     faster_whisper.py  # FasterWhisperBackend — faster-whisper (CTranslate2, no torch at runtime)
     bark.py            # BarkBackend — Bark TTS via HuggingFace transformers
     open_clip.py       # OpenCLIPBackend — image/text embeddings via open-clip-torch
+    dinov2.py          # DINOv2Backend — image-only embeddings via HuggingFace transformers (CLS or mean pooling)
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
@@ -76,6 +77,7 @@ tests/
   test_faster_whisper_backend.py  # FasterWhisperBackend mocked tests (9 tests)
   test_bark_backend.py            # BarkBackend mocked tests (9 tests)
   test_open_clip_backend.py       # OpenCLIPBackend mocked tests (12 tests)
+  test_dinov2_backend.py          # DINOv2Backend mocked tests (10 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run)
   test_smoke_whisper.py           # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
 ```
@@ -111,7 +113,8 @@ tests/
 - **WAV encoding** — `_audio_utils.encode_wav()` encodes a float32 numpy array to 16-bit PCM WAV bytes (pure numpy/struct, no scipy). Used by `BarkBackend` to produce the `audio_b64` response field.
 - **TTS vs ASR model_type** — `TTSRequest`/`TTSResponse` use `ModelType.TTS = "tts"`, distinct from `ModelType.AUDIO = "audio"` used by Whisper/faster-whisper. Both are in `AnyRequest` discriminated union.
 - **OpenCLIP mutually exclusive inputs** — `EmbeddingRequest` accepts either `texts: list[str]` or `images_b64: list[str]`, never both. Validated by `@model_validator`. A single request batches multiple items; `batch_predict` runs requests sequentially.
-- **PIL stored at load() time** — `OpenCLIPBackend._Image` is set to `PIL.Image` during `load()` so tests can inject a mock without PIL installed in the test environment.
+- **PIL stored at load() time** — `OpenCLIPBackend._Image` and `DINOv2Backend._Image` are set to `PIL.Image` during `load()` so tests can inject a mock without PIL installed in the test environment.
+- **DINOv2 pooling strategies** — `DINOv2Backend` supports `pooling="cls"` (CLS token at `last_hidden_state[:, 0, :]`, default) and `pooling="mean"` (mean of patch tokens at `[:, 1:, :]`). Image-only; raises `ValueError` on `texts` input.
 
 ## Adding a new backend
 

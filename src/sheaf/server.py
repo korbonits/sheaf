@@ -17,6 +17,7 @@ from ray import serve
 # This ensures the registry is populated in Ray Serve worker processes.
 import sheaf.backends.bark  # noqa: F401
 import sheaf.backends.chronos  # noqa: F401
+import sheaf.backends.dinov2  # noqa: F401
 import sheaf.backends.faster_whisper  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.open_clip  # noqa: F401
@@ -72,6 +73,7 @@ class _SheafDeployment:
         # the freshly-populated worker registry.
         import sheaf.backends.bark  # noqa: F401
         import sheaf.backends.chronos  # noqa: F401
+        import sheaf.backends.dinov2  # noqa: F401
         import sheaf.backends.faster_whisper  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.open_clip  # noqa: F401
