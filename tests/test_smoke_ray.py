@@ -12,6 +12,7 @@ Set SHEAF_SMOKE_TEST=1 to enable, or pass --smoke to pytest.
 
 from __future__ import annotations
 
+import base64
 import os
 import time
 
@@ -20,7 +21,17 @@ import requests
 
 from sheaf.api.base import ModelType
 from sheaf.spec import ModelSpec, ResourceConfig
-from tests.stubs import ErrorTimeSeriesBackend, SmokeTimeSeriesBackend
+from tests.stubs import (
+    ErrorTimeSeriesBackend,
+    SmokeDepthBackend,
+    SmokeDetectionBackend,
+    SmokeEmbeddingBackend,
+    SmokeMolecularBackend,
+    SmokeSegmentationBackend,
+    SmokeTimeSeriesBackend,
+)
+
+_FAKE_IMG_B64 = base64.b64encode(b"fake").decode()
 
 # ---------------------------------------------------------------------------
 # Opt-in gate
@@ -85,9 +96,55 @@ def urls():
         backend_cls=ErrorTimeSeriesBackend,  # cloudpickled to worker
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    emb_spec = ModelSpec(
+        name="smoke-embedding",
+        model_type=ModelType.EMBEDDING,
+        backend="_smoke_embedding",
+        backend_cls=SmokeEmbeddingBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
+    seg_spec = ModelSpec(
+        name="smoke-segmentation",
+        model_type=ModelType.SEGMENTATION,
+        backend="_smoke_segmentation",
+        backend_cls=SmokeSegmentationBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
+    mol_spec = ModelSpec(
+        name="smoke-molecular",
+        model_type=ModelType.MOLECULAR,
+        backend="_smoke_molecular",
+        backend_cls=SmokeMolecularBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
+    depth_spec = ModelSpec(
+        name="smoke-depth",
+        model_type=ModelType.DEPTH,
+        backend="_smoke_depth",
+        backend_cls=SmokeDepthBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
+    det_spec = ModelSpec(
+        name="smoke-detection",
+        model_type=ModelType.DETECTION,
+        backend="_smoke_detection",
+        backend_cls=SmokeDetectionBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
-        models=[cls_spec, reg_spec, err_spec], host="127.0.0.1", port=_SMOKE_PORT
+        models=[
+            cls_spec,
+            reg_spec,
+            err_spec,
+            emb_spec,
+            seg_spec,
+            mol_spec,
+            depth_spec,
+            det_spec,
+        ],
+        host="127.0.0.1",
+        port=_SMOKE_PORT,
     )
     server.run()
 
@@ -99,6 +156,11 @@ def urls():
         ("smoke-ts", base_cls),
         ("smoke-registry", base_reg),
         ("smoke-error", base_err),
+        ("smoke-embedding", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-embedding"),
+        ("smoke-segmentation", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-segmentation"),
+        ("smoke-molecular", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-molecular"),
+        ("smoke-depth", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-depth"),
+        ("smoke-detection", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -113,7 +175,17 @@ def urls():
             ray.shutdown()
             pytest.fail(f"{label} did not become ready within 30s")
 
-    yield {"cls": base_cls, "registry": base_reg, "error": base_err, "server": server}
+    yield {
+        "cls": base_cls,
+        "registry": base_reg,
+        "error": base_err,
+        "embedding": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-embedding",
+        "segmentation": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-segmentation",
+        "molecular": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-molecular",
+        "depth": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-depth",
+        "detection": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-detection",
+        "server": server,
+    }
 
     server.shutdown()
     ray.shutdown()
@@ -284,6 +356,109 @@ def test_backend_error_returns_500(error_serving_url: str) -> None:
     detail = r.json()["detail"]
     assert "RuntimeError" in detail
     assert "backend exploded" in detail
+
+
+# ---------------------------------------------------------------------------
+# New-modality end-to-end smoke tests
+# ---------------------------------------------------------------------------
+
+
+def test_embedding_predict(urls: dict) -> None:
+    """EmbeddingRequest routes correctly through the AnyRequest union."""
+    url = urls["embedding"]
+    payload = {
+        "model_type": "embedding",
+        "model_name": "smoke-embedding",
+        "texts": ["hello", "world"],
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["dim"] == 3
+    assert len(body["embeddings"]) == 2
+
+
+def test_segmentation_predict(urls: dict) -> None:
+    """SegmentationRequest routes correctly; mask_b64 returned."""
+    url = urls["segmentation"]
+    payload = {
+        "model_type": "segmentation",
+        "model_name": "smoke-segmentation",
+        "image_b64": _FAKE_IMG_B64,
+        "box": [0.0, 0.0, 64.0, 64.0],
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["height"] == 4
+    assert body["width"] == 4
+    assert len(body["masks_b64"]) == 1
+    assert len(body["scores"]) == 1
+
+
+def test_molecular_predict(urls: dict) -> None:
+    """MolecularRequest routes correctly; embeddings returned for each sequence."""
+    url = urls["molecular"]
+    payload = {
+        "model_type": "molecular",
+        "model_name": "smoke-molecular",
+        "sequences": ["MKTII", "ACDEF"],
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["dim"] == 3
+    assert len(body["embeddings"]) == 2
+
+
+def test_depth_predict(urls: dict) -> None:
+    """DepthRequest routes correctly; depth_b64 and bounds returned."""
+    url = urls["depth"]
+    payload = {
+        "model_type": "depth",
+        "model_name": "smoke-depth",
+        "image_b64": _FAKE_IMG_B64,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["height"] == 4
+    assert body["width"] == 4
+    assert "depth_b64" in body
+    assert body["min_depth"] == pytest.approx(0.5)
+    assert body["max_depth"] == pytest.approx(0.5)
+
+
+def test_detection_predict(urls: dict) -> None:
+    """DetectionRequest routes correctly; boxes/labels/scores returned."""
+    url = urls["detection"]
+    payload = {
+        "model_type": "detection",
+        "model_name": "smoke-detection",
+        "image_b64": _FAKE_IMG_B64,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["boxes"]) == 1
+    assert body["labels"] == ["cat"]
+    assert body["scores"] == pytest.approx([0.9])
+    assert body["width"] == 640
+    assert body["height"] == 480
+
+
+def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:
+    """Sending time_series payload to an embedding deployment → 422."""
+    url = urls["embedding"]
+    payload = {
+        "model_type": "time_series",
+        "model_name": "smoke-embedding",
+        "history": [1.0, 2.0],
+        "horizon": 2,
+        "frequency": "1h",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 422
 
 
 def test_hot_swap(serving_url: str, model_server) -> None:  # type: ignore[type-arg]
