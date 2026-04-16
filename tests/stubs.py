@@ -15,6 +15,7 @@ from sheaf.api.audio_generation import AudioGenerationRequest, AudioGenerationRe
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 from sheaf.api.depth import DepthRequest, DepthResponse
 from sheaf.api.detection import DetectionRequest, DetectionResponse
+from sheaf.api.diffusion import DiffusionRequest, DiffusionResponse
 from sheaf.api.embedding import EmbeddingRequest, EmbeddingResponse
 from sheaf.api.genomic import GenomicRequest, GenomicResponse
 from sheaf.api.materials import MaterialsRequest, MaterialsResponse
@@ -434,6 +435,56 @@ class SmokeTabularBackend(ModelBackend):
             task=request.task,
             n_context=len(request.context_X),
             n_query=n,
+        )
+
+
+@register_backend("_smoke_diffusion")
+class SmokeDiffusionBackend(ModelBackend):
+    """Returns a minimal 8×8 white PNG for any prompt."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.DIFFUSION
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        import base64
+        import struct
+        import zlib
+
+        assert isinstance(request, DiffusionRequest)
+
+        # Minimal valid 8×8 white PNG — built without PIL
+        def _png(w: int, h: int) -> bytes:
+            raw = b"\x00" + b"\xff\xff\xff" * w
+            scanlines = raw * h
+            compressed = zlib.compress(scanlines)
+
+            def chunk(tag: bytes, data: bytes) -> bytes:
+                c = tag + data
+                return (
+                    struct.pack(">I", len(data))
+                    + c
+                    + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+                )
+
+            return (
+                b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                + chunk(b"IDAT", compressed)
+                + chunk(b"IEND", b"")
+            )
+
+        png_bytes = _png(request.width, request.height)
+        return DiffusionResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            image_b64=base64.b64encode(png_bytes).decode(),
+            height=request.height,
+            width=request.width,
+            seed=request.seed or 0,
         )
 
 

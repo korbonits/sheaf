@@ -53,6 +53,7 @@ from sheaf.api.audio import AudioRequest, TTSRequest
 from sheaf.api.audio_generation import AudioGenerationRequest
 from sheaf.api.depth import DepthRequest
 from sheaf.api.detection import DetectionRequest
+from sheaf.api.diffusion import DiffusionRequest
 from sheaf.api.embedding import EmbeddingRequest
 from sheaf.api.genomic import GenomicRequest
 from sheaf.api.materials import MaterialsRequest
@@ -82,7 +83,8 @@ AnyRequest = Annotated[
     | DetectionRequest
     | WeatherRequest
     | SatelliteRequest
-    | MultimodalEmbeddingRequest,
+    | MultimodalEmbeddingRequest
+    | DiffusionRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -115,6 +117,7 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
     import sheaf.backends.dinov2  # noqa: F401
     import sheaf.backends.esm3  # noqa: F401
     import sheaf.backends.faster_whisper  # noqa: F401
+    import sheaf.backends.flux  # noqa: F401
     import sheaf.backends.graphcast  # noqa: F401
     import sheaf.backends.imagebind  # noqa: F401
     import sheaf.backends.mace  # noqa: F401

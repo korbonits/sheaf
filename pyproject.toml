@@ -88,6 +88,11 @@ multimodal = [
     "torchvision>=0.15.0",
     "torchaudio>=2.0.0",
 ]
+diffusion = [
+    "diffusers>=0.30.0",
+    "torch>=2.0.0",
+    "transformers>=4.37.0",  # diffusers depends on transformers for text encoders
+]
 feast = [
     "feast>=0.40.0",
 ]
