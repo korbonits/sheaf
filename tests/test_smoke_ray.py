@@ -34,7 +34,9 @@ from tests.stubs import (
     SmokeSatelliteBackend,
     SmokeSegmentationBackend,
     SmokeSmallMoleculeBackend,
+    SmokeTabularBackend,
     SmokeTimeSeriesBackend,
+    SmokeTTSBackend,
     SmokeWeatherBackend,
 )
 
@@ -187,6 +189,20 @@ def urls():
         backend_cls=SmokeMultimodalEmbeddingBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    tabular_spec = ModelSpec(
+        name="smoke-tabular",
+        model_type=ModelType.TABULAR,
+        backend="_smoke_tabular",
+        backend_cls=SmokeTabularBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
+    tts_spec = ModelSpec(
+        name="smoke-tts",
+        model_type=ModelType.TTS,
+        backend="_smoke_tts",
+        backend_cls=SmokeTTSBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -205,6 +221,8 @@ def urls():
             small_mol_spec,
             audio_gen_spec,
             multimodal_spec,
+            tabular_spec,
+            tts_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -240,6 +258,8 @@ def urls():
             "smoke-multimodal",
             f"http://127.0.0.1:{_SMOKE_PORT}/smoke-multimodal",
         ),
+        ("smoke-tabular", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tabular"),
+        ("smoke-tts", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -270,6 +290,8 @@ def urls():
         "small_molecule": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-small-molecule",
         "audio_generation": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-audio-generation",
         "multimodal": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-multimodal",
+        "tabular": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tabular",
+        "tts": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts",
         "server": server,
     }
 
@@ -702,6 +724,47 @@ def test_multimodal_embedding_predict(urls: dict) -> None:
     assert body["modality"] == "text"
     assert len(body["embeddings"]) == 2
     assert len(body["embeddings"][0]) == 4
+
+
+def test_tabular_predict(urls: dict) -> None:
+    """TabularRequest routes correctly; predictions + probabilities returned."""
+    url = urls["tabular"]
+    payload = {
+        "model_type": "tabular",
+        "model_name": "smoke-tabular",
+        "context_X": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+        "context_y": [0, 1, 0],
+        "query_X": [[2.0, 3.0], [4.0, 5.0]],
+        "task": "classification",
+        "output_mode": "probabilities",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["task"] == "classification"
+    assert body["n_context"] == 3
+    assert body["n_query"] == 2
+    assert body["predictions"] == [0, 0]
+    assert len(body["probabilities"]) == 2
+    assert body["probabilities"][0] == pytest.approx([0.8, 0.2])
+    assert body["classes"] == [0, 1]
+
+
+def test_tts_predict(urls: dict) -> None:
+    """TTSRequest routes correctly; WAV audio returned."""
+    url = urls["tts"]
+    payload = {
+        "model_type": "tts",
+        "model_name": "smoke-tts",
+        "text": "Hello from sheaf.",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["sample_rate"] == 24000
+    wav_bytes = base64.b64decode(body["audio_b64"])
+    assert wav_bytes[:4] == b"RIFF"
+    assert wav_bytes[8:12] == b"WAVE"
 
 
 def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:

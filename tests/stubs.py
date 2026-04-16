@@ -10,6 +10,7 @@ import base64
 
 import numpy as np
 
+from sheaf.api.audio import TTSRequest, TTSResponse
 from sheaf.api.audio_generation import AudioGenerationRequest, AudioGenerationResponse
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 from sheaf.api.depth import DepthRequest, DepthResponse
@@ -25,6 +26,7 @@ from sheaf.api.multimodal_embedding import (
 from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
 from sheaf.api.small_molecule import SmallMoleculeRequest, SmallMoleculeResponse
+from sheaf.api.tabular import TabularRequest, TabularResponse
 from sheaf.api.time_series import TimeSeriesRequest, TimeSeriesResponse
 from sheaf.api.weather import WeatherRequest, WeatherResponse
 from sheaf.backends.base import ModelBackend
@@ -406,4 +408,57 @@ class SmokeSmallMoleculeBackend(ModelBackend):
             model_name=request.model_name,
             embeddings=[[0.0, 0.0, 0.0, 0.0]] * n,
             dim=4,
+        )
+
+
+@register_backend("_smoke_tabular")
+class SmokeTabularBackend(ModelBackend):
+    """Returns fixed classification predictions (all class 0, prob=[0.8, 0.2])."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.TABULAR
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, TabularRequest)
+        n = len(request.query_X)
+        return TabularResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            predictions=[0] * n,
+            probabilities=[[0.8, 0.2]] * n,
+            classes=[0, 1],
+            task=request.task,
+            n_context=len(request.context_X),
+            n_query=n,
+        )
+
+
+@register_backend("_smoke_tts")
+class SmokeTTSBackend(ModelBackend):
+    """Returns a minimal silent WAV for any TTS request."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.TTS
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, TTSRequest)
+        # 0.1s silent WAV at 24000 Hz
+        n_samples = 2400
+        from sheaf.backends._audio_utils import encode_wav
+
+        silent = np.zeros(n_samples, dtype=np.float32)
+        wav_bytes = encode_wav(silent, 24000)
+        return TTSResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            audio_b64=base64.b64encode(wav_bytes).decode(),
+            sample_rate=24000,
         )
