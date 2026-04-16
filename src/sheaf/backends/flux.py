@@ -81,7 +81,7 @@ class FluxBackend(ModelBackend):
 
     def load(self) -> None:
         try:
-            import torch
+            import torch  # ty: ignore[unresolved-import]
             from diffusers import FluxPipeline  # ty: ignore[unresolved-import]
         except ImportError as e:
             raise ImportError(
@@ -118,7 +118,7 @@ class FluxBackend(ModelBackend):
         if self._pipeline is None:
             raise RuntimeError("Backend not loaded. Call load() first.")
 
-        import torch
+        import torch  # ty: ignore[unresolved-import]
 
         seed = (
             request.seed if request.seed is not None else random.randint(0, 2**32 - 1)
