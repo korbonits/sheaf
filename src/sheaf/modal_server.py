@@ -69,6 +69,7 @@ from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
 from sheaf.metrics import record_predict, register_metrics_endpoint, time_load
 from sheaf.spec import ModelSpec
+from sheaf.tracing import configure_tracing, record_exception, trace_predict, trace_span
 
 AnyRequest = Annotated[
     TimeSeriesRequest
@@ -185,6 +186,8 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
 
         configure_logging()
 
+    configure_tracing()
+
     asgi_app = FastAPI(title="Sheaf")
     register_metrics_endpoint(asgi_app, "sheaf")
 
@@ -215,55 +218,64 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                 ),
             )
 
-        # Feast feature resolution — per-request, before inference.
-        _feature_ref = getattr(request, "feature_ref", None)
-        if _feature_ref is not None:
-            if feast is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        f"Request contains feature_ref but ModelSpec '{name}' "
-                        "has no feast_repo_path configured."
-                    ),
+        with trace_predict(
+            name,
+            str(request.model_type),
+            request.model_name or "",
+            str(request.request_id),
+        ) as _span:
+            # Feast feature resolution — per-request, before inference.
+            _feature_ref = getattr(request, "feature_ref", None)
+            if _feature_ref is not None:
+                if feast is None:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"Request contains feature_ref but ModelSpec '{name}' "
+                            "has no feast_repo_path configured."
+                        ),
+                    )
+                try:
+                    with trace_span("sheaf.feast.resolve", deployment=name):
+                        history = feast.resolve(_feature_ref)
+                except Exception as exc:
+                    _logger.exception("Feast resolution error in deployment '%s'", name)
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Feast resolution failed: {type(exc).__name__}: {exc}",
+                    ) from exc
+                request = request.model_copy(
+                    update={"history": history, "feature_ref": None}
                 )
-            try:
-                history = feast.resolve(_feature_ref)
-            except Exception as exc:
-                _logger.exception("Feast resolution error in deployment '%s'", name)
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Feast resolution failed: {type(exc).__name__}: {exc}",
-                ) from exc
-            request = request.model_copy(
-                update={"history": history, "feature_ref": None}
-            )
 
-        _t0 = time.perf_counter()
-        _log_extra: dict[str, object] = {
-            "request_id": str(request.request_id),
-            "deployment": name,
-            "model_type": request.model_type,
-            "model_name": request.model_name,
-        }
-        try:
-            result = await backend.async_predict(request)
-            _latency_s = time.perf_counter() - _t0
-            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
-            _log_extra["status"] = "ok"
-            _logger.info("predict ok", extra=_log_extra)
-            record_predict(name, request.model_type, "ok", _latency_s)
-            return result.model_dump(mode="json")
-        except Exception as exc:
-            _latency_s = time.perf_counter() - _t0
-            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
-            _log_extra["status"] = "error"
-            _log_extra["error"] = f"{type(exc).__name__}: {exc}"
-            _logger.exception("predict error", extra=_log_extra)
-            record_predict(name, request.model_type, "error", _latency_s)
-            raise HTTPException(
-                status_code=500,
-                detail=f"{type(exc).__name__}: {exc}",
-            ) from exc
+            _t0 = time.perf_counter()
+            _log_extra: dict[str, object] = {
+                "request_id": str(request.request_id),
+                "deployment": name,
+                "model_type": request.model_type,
+                "model_name": request.model_name,
+            }
+            try:
+                with trace_span("sheaf.backend.infer", deployment=name):
+                    result = await backend.async_predict(request)
+                _latency_s = time.perf_counter() - _t0
+                _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
+                _log_extra["status"] = "ok"
+                _logger.info("predict ok", extra=_log_extra)
+                record_predict(name, request.model_type, "ok", _latency_s)
+                return result.model_dump(mode="json")
+            except Exception as exc:
+                _latency_s = time.perf_counter() - _t0
+                _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
+                _log_extra["status"] = "error"
+                _log_extra["error"] = f"{type(exc).__name__}: {exc}"
+                _logger.exception("predict error", extra=_log_extra)
+                record_predict(name, request.model_type, "error", _latency_s)
+                record_exception(_span, exc)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"{type(exc).__name__}: {exc}",
+                ) from exc
 
     return asgi_app
 

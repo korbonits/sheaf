@@ -53,6 +53,7 @@ PyPI: `pip install sheaf-serve`
 **What works (v0.5 Ops/DX — in progress):**
 - Structured JSON logging: `sheaf.logging.JsonFormatter` + `configure_logging()`; gated by `SHEAF_LOG_JSON=1`; request_id / latency_ms / status in every predict log line; 15 tests in `test_logging.py`
 - Prometheus metrics: `sheaf.metrics` module — `sheaf_requests_total`, `sheaf_request_duration_seconds`, `sheaf_batch_size_total`, `sheaf_backend_load_seconds`; `GET /metrics` per deployment; lazy import, `SHEAF_METRICS_DISABLED=1` guard; 337 tests passing; install with `pip install 'sheaf-serve[metrics]'`
+- OpenTelemetry tracing: `sheaf.tracing` module — `sheaf.predict` span per request with sub-spans for Feast resolution (`sheaf.feast.resolve`) and backend inference (`sheaf.backend.infer`); `configure_tracing()` auto-configures SDK from `OTEL_EXPORTER_OTLP_ENDPOINT` or `SHEAF_OTEL_CONSOLE=1`; lazy import, `SHEAF_TRACING_DISABLED=1` guard, `_NoopTracer`/`_NoopSpan` shims when OTel absent; 24 tests in `test_tracing.py`; install with `pip install 'sheaf-serve[tracing]'`
 
 ## Repo layout
 
@@ -64,6 +65,7 @@ src/sheaf/
   registry.py          # @register_backend decorator + _BACKEND_REGISTRY dict
   logging.py           # JsonFormatter + configure_logging — structured JSON logging (SHEAF_LOG_JSON=1)
   metrics.py           # Prometheus metrics: record_predict/batch/load, register_metrics_endpoint, time_load
+  tracing.py           # OTel tracing: configure_tracing, get_tracer, trace_predict, trace_span, record_exception
   api/
     base.py            # BaseRequest, BaseResponse, ModelType enum
     time_series.py     # TimeSeriesRequest/Response, Frequency, OutputMode
@@ -154,6 +156,7 @@ tests/
   test_videomae_backend.py             # VideoMAEBackend mocked tests (17 tests)
   test_logging.py                      # JsonFormatter + configure_logging + server integration (15 tests)
   test_metrics.py                      # Prometheus metrics module (no-op absent/disabled + functional, 11+ tests)
+  test_tracing.py                      # OTel tracing: NoopSpan/Tracer, configure_tracing, span attributes (24 tests)
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
@@ -222,6 +225,9 @@ tests/
 - **Prometheus metrics — lazy `/metrics` handler** — the `metrics()` handler in `register_metrics_endpoint` imports `prometheus_client` and calls `_get_registry()` at request time (not at route-registration time). This keeps the function's closure free of non-picklable objects, which is required by the Ray Serve path above.
 - **Structured logging** — `sheaf.logging.JsonFormatter` emits single-line JSON with `ts`, `level`, `logger`, `message`, and any `extra={}` fields. `configure_logging()` installs it idempotently on the root logger; gated by `SHEAF_LOG_JSON=1`. Both `server.py` and `modal_server.py` log `request_id`, `deployment`, `model_type`, `model_name`, `latency_ms`, `status` ("ok"/"error"), and `error` (on failures) via `logger.info/exception("predict ok/error", extra={...})`.
 - **Prometheus metrics names** — `sheaf_requests_total` (Counter, labels: deployment/model_type/status), `sheaf_request_duration_seconds` (Histogram), `sheaf_batch_size_total` (Histogram, labels: deployment), `sheaf_backend_load_seconds` (Gauge). `SHEAF_METRICS_DISABLED=1` disables all recording and endpoint registration even when `prometheus_client` is installed.
+- **OTel tracing singleton** — `trace.set_tracer_provider()` is a one-time operation per process; subsequent calls are silently ignored by OTel. `configure_tracing()` is idempotent by checking `isinstance(current, SdkTracerProvider)` before setting. Tests that test span creation use `monkeypatch.setattr(t, "get_tracer", lambda: local_provider.get_tracer("sheaf"))` with a `TracerProvider` + `InMemorySpanExporter` to bypass global state; tests that verify `configure_tracing()` mock `trace.set_tracer_provider` and `trace.get_tracer_provider` instead.
+- **OTel tracing spans** — `sheaf.predict` outer span wraps the full request; sub-spans `sheaf.feast.resolve` and `sheaf.backend.infer` are emitted via `trace_span()`. `trace_predict()` does not auto-record exceptions (call `record_exception(span, exc)` explicitly in the `except` block before raising `HTTPException`) so the original exception is captured, not the wrapping HTTP exception. `record_exception()` guards the `StatusCode` import so call sites don't need OTel installed.
+- **OTel `configure_tracing()` env vars** — `OTEL_EXPORTER_OTLP_ENDPOINT` triggers OTLP/HTTP exporter (appends `/v1/traces`); `SHEAF_OTEL_CONSOLE=1` triggers `ConsoleSpanExporter` (dev/CI). If neither is set, `configure_tracing()` returns immediately without initialising the SDK (zero overhead). `OTEL_SERVICE_NAME` overrides the service name resource attribute.
 
 ## Adding a new backend
 

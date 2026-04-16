@@ -65,6 +65,7 @@ from sheaf.metrics import (
 )
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
 from sheaf.spec import ModelSpec
+from sheaf.tracing import configure_tracing, record_exception, trace_predict, trace_span
 
 # Allow extra backend modules to be registered at worker startup via an env var.
 # Useful for custom backends and testing:
@@ -163,6 +164,8 @@ class _SheafDeployment:
 
             configure_logging()
 
+        configure_tracing()
+
         self._backend: ModelBackend = backend_cls(**spec.backend_kwargs)
         with time_load(spec.name, spec.model_type):
             self._backend.load()
@@ -249,58 +252,67 @@ class _SheafDeployment:
                 ),
             )
 
-        # Feast feature resolution — runs before batching so each entity
-        # is looked up independently and the backend always sees `history`.
-        _feature_ref = getattr(request, "feature_ref", None)
-        if _feature_ref is not None:
-            if self._feast is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        "Request contains feature_ref but ModelSpec "
-                        f"'{self._spec.name}' has no feast_repo_path configured."
-                    ),
+        with trace_predict(
+            self._spec.name,
+            str(request.model_type),
+            request.model_name or "",
+            str(request.request_id),
+        ) as _span:
+            # Feast feature resolution — runs before batching so each entity
+            # is looked up independently and the backend always sees `history`.
+            _feature_ref = getattr(request, "feature_ref", None)
+            if _feature_ref is not None:
+                if self._feast is None:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            "Request contains feature_ref but ModelSpec "
+                            f"'{self._spec.name}' has no feast_repo_path configured."
+                        ),
+                    )
+                try:
+                    with trace_span("sheaf.feast.resolve", deployment=self._spec.name):
+                        history = self._feast.resolve(_feature_ref)
+                except Exception as exc:
+                    _logger.exception(
+                        "Feast resolution error in deployment '%s'", self._spec.name
+                    )
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Feast resolution failed: {type(exc).__name__}: {exc}",
+                    ) from exc
+                request = request.model_copy(
+                    update={"history": history, "feature_ref": None}
                 )
-            try:
-                history = self._feast.resolve(_feature_ref)
-            except Exception as exc:
-                _logger.exception(
-                    "Feast resolution error in deployment '%s'", self._spec.name
-                )
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Feast resolution failed: {type(exc).__name__}: {exc}",
-                ) from exc
-            request = request.model_copy(
-                update={"history": history, "feature_ref": None}
-            )
 
-        _t0 = time.perf_counter()
-        _log_extra: dict[str, object] = {
-            "request_id": str(request.request_id),
-            "deployment": self._spec.name,
-            "model_type": request.model_type,
-            "model_name": request.model_name,
-        }
-        try:
-            result = await self._batch_predict(request)  # type: ignore[return-value]
-            _latency_s = time.perf_counter() - _t0
-            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
-            _log_extra["status"] = "ok"
-            _logger.info("predict ok", extra=_log_extra)
-            record_predict(self._spec.name, request.model_type, "ok", _latency_s)
-            return result
-        except Exception as exc:
-            _latency_s = time.perf_counter() - _t0
-            _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
-            _log_extra["status"] = "error"
-            _log_extra["error"] = f"{type(exc).__name__}: {exc}"
-            _logger.exception("predict error", extra=_log_extra)
-            record_predict(self._spec.name, request.model_type, "error", _latency_s)
-            raise HTTPException(
-                status_code=500,
-                detail=f"{type(exc).__name__}: {exc}",
-            ) from exc
+            _t0 = time.perf_counter()
+            _log_extra: dict[str, object] = {
+                "request_id": str(request.request_id),
+                "deployment": self._spec.name,
+                "model_type": request.model_type,
+                "model_name": request.model_name,
+            }
+            try:
+                with trace_span("sheaf.backend.infer", deployment=self._spec.name):
+                    result = await self._batch_predict(request)  # type: ignore[return-value]
+                _latency_s = time.perf_counter() - _t0
+                _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
+                _log_extra["status"] = "ok"
+                _logger.info("predict ok", extra=_log_extra)
+                record_predict(self._spec.name, request.model_type, "ok", _latency_s)
+                return result
+            except Exception as exc:
+                _latency_s = time.perf_counter() - _t0
+                _log_extra["latency_ms"] = round(_latency_s * 1000, 2)
+                _log_extra["status"] = "error"
+                _log_extra["error"] = f"{type(exc).__name__}: {exc}"
+                _logger.exception("predict error", extra=_log_extra)
+                record_predict(self._spec.name, request.model_type, "error", _latency_s)
+                record_exception(_span, exc)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"{type(exc).__name__}: {exc}",
+                ) from exc
 
     @serve.batch(max_batch_size=32, batch_wait_timeout_s=0.05)
     async def _batch_predict(self, requests: list[BaseRequest]) -> list[dict[str, Any]]:
@@ -362,6 +374,8 @@ class ModelServer:
             from sheaf.logging import configure_logging
 
             configure_logging()
+
+        configure_tracing()
 
         if not ray.is_initialized():
             ray.init()
