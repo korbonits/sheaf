@@ -26,7 +26,6 @@ The time series contract (`src/sheaf/api/time_series.py`) and Chronos2 backend (
 **Wanted backends (in priority order):**
 - FLUX (`diffusion`) — image generation via diffusers
 - VideoMAE / TimeSformer (`video`) — video understanding / classification
-- Feast feature resolver — end-to-end `feature_ref` resolution in `TimeSeriesRequest`
 
 ### API contract feedback
 
@@ -73,13 +72,13 @@ class MyModelBackend(ModelBackend):
 
 Then add your model's optional dependencies to `pyproject.toml` under `[project.optional-dependencies]`.
 
-## Implemented backends (v0.3)
+## Implemented backends (v0.3 — complete)
 
 All backends below are implemented, tested, and wired into the Ray Serve smoke suite:
 
 | Backend | Registry key | Install extra | Notes |
 |---|---|---|---|
-| Chronos2 | `chronos` | `time-series` | Chronos-Bolt and Chronos-T5 families |
+| Chronos2 | `chronos2` | `time-series` | Chronos-Bolt and Chronos-T5 families |
 | TimesFM | `timesfm` | `time-series` | Google TimesFM |
 | Moirai | `moirai` | `moirai` | Salesforce Moirai (uni2ts) |
 | TabPFN | `tabpfn` | `tabular` | Classification + regression; requires `TABPFN_TOKEN` |
@@ -98,6 +97,54 @@ All backends below are implemented, tested, and wired into the Ray Serve smoke s
 | MACE | `mace` | `materials` | Universal interatomic potential (energy, forces, stress) |
 | Prithvi | `prithvi` | `earth-observation` | IBM/NASA geospatial embeddings |
 | GraphCast | `graphcast` | `weather` | Google DeepMind weather forecasting |
+| ImageBind | `imagebind` | `multimodal` | Cross-modal embeddings; install from source (not on PyPI) |
+
+## Feast feature store integration
+
+`TimeSeriesRequest` accepts either raw `history` or a `feature_ref` — a pointer into a Feast online feature store. The serving layer resolves the feature before inference; backends always see `history`.
+
+To use Feast, set `feast_repo_path` on `ModelSpec`:
+
+```python
+spec = ModelSpec(
+    name="chronos",
+    model_type=ModelType.TIME_SERIES,
+    backend="chronos2",
+    feast_repo_path="/feast/feature_repo",
+)
+```
+
+Then send requests with `feature_ref` instead of `history`:
+
+```json
+{
+    "model_type": "time_series",
+    "model_name": "chronos",
+    "feature_ref": {
+        "feature_view": "asset_prices",
+        "feature_name": "close_history_30d",
+        "entity_key": "ticker",
+        "entity_value": "AAPL"
+    },
+    "horizon": 7,
+    "frequency": "1d"
+}
+```
+
+See `examples/quickstart_feast.py` for a full end-to-end example with a local SQLite store.
+
+## Modal serverless deployment
+
+`ModalServer` is a zero-infra alternative to `ModelServer` (Ray Serve). It wraps the same `ModelSpec` list and deploys to Modal's managed GPU infrastructure:
+
+```python
+from sheaf import ModalServer
+
+server = ModalServer(models=[spec], app_name="my-sheaf", gpu="A10G")
+app = server.app  # modal deploy my_server.py
+```
+
+See `examples/quickstart_modal.py` for a full example.
 
 ## Code style
 

@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.2 (complete) / v0.3 (complete except Feast)
+## Current state: v0.3 complete / v0.4 next
 
 **What works (v0.2):**
 - Time series: Chronos2, TimesFM, and Moirai backends, full quantile/sample/mean output modes; multivariate support
@@ -39,11 +39,12 @@ PyPI: `pip install sheaf-serve`
 - Weather forecasting: GraphCast backend (`graphcast`, `dm-haiku`, `jax`, `xarray`) — autoregressive n-step rollout from ERA5 surface+atmospheric fields; checkpoint loaded from `.npz`; install with `pip install 'sheaf-serve[weather]'`
 - Earth observation: Prithvi backend (`transformers`, `torch`) — IBM/NASA Prithvi-EO geospatial embeddings via `AutoModel` + `AutoImageProcessor` with `trust_remote_code=True`; `SatelliteRequest` accepts `(n_time, n_bands, H, W)` float32 pixels; per-band z-score normalization; CLS and mean pooling; install with `pip install 'sheaf-serve[earth-observation]'`
 - Cross-modal embeddings: ImageBind backend — five modalities (text, vision, audio, depth, thermal) in a shared 1024-dim embedding space; `MultimodalEmbeddingRequest` accepts exactly one modality field; image/audio inputs written to named temp files (imagebind loaders require file paths); imagebind not on PyPI: `pip install git+https://github.com/facebookresearch/ImageBind.git` then `pip install 'sheaf-serve[multimodal]'`
+- Cross-modal embeddings: ImageBind backend — five modalities (text, vision, audio, depth, thermal) in a shared 1024-dim embedding space; `MultimodalEmbeddingRequest` accepts exactly one modality field; image/audio inputs written to named temp files (imagebind loaders require file paths); imagebind not on PyPI: `pip install git+https://github.com/facebookresearch/ImageBind.git` then `pip install 'sheaf-serve[multimodal]'`
+- Feast feature store: `FeatureRef` Pydantic model in `api/time_series.py`; `FeastResolver` in `integrations/feast.py` wraps `feast.FeatureStore`, resolves online features to `list[float]`; `feast_repo_path` field on `ModelSpec`; resolution happens per-request before batching in both `server.py` and `modal_server.py`; 502 on upstream Feast errors, 422 on missing `feast_repo_path`; smoke test in `test_smoke_feast.py`; example in `examples/quickstart_feast.py`; install with `pip install 'sheaf-serve[feast]'`
+- Modal serverless: `ModalServer` in `modal_server.py` — zero-infra alternative to `ModelServer`; `backend_cls` modules cloudpickled by value via `register_pickle_by_value`; `AnyRequest` defined directly from lightweight API modules (no ray dep); `_build_asgi_app` shared ASGI builder; example in `examples/quickstart_modal.py`; install with `pip install 'sheaf-serve[modal]'`
 - TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` + `predict()` against the live library; 8 tests in `test_tabpfn_integration.py`
 - Ray Serve smoke coverage: all modalities have end-to-end smoke tests in `test_smoke_ray.py`
-
-**v0.3 remaining:**
-- Feast feature resolver end-to-end
+- Feast smoke coverage: real SQLite store, materialise → resolve → predict; 8 tests in `test_smoke_feast.py`; gated on `SHEAF_SMOKE_TEST=1`
 
 **v0.4 targets:**
 - FLUX diffusion / image generation
@@ -100,19 +101,25 @@ src/sheaf/
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
   cache/               # stub
-  integrations/        # stub
+  integrations/
+    __init__.py        # exports FeastResolver
+    feast.py           # FeastResolver — wraps feast.FeatureStore, resolves FeatureRef → list[float]
 examples/
   quickstart.py        # Chronos time series example
   quickstart_tabular.py
   time_series_comparison.py  # Chronos vs TimesFM
   quickstart_audio.py        # Whisper + faster-whisper transcription, word timestamps, translation
   quickstart_vision.py       # DINOv2 + OpenCLIP image embeddings, CLS vs mean pooling, cross-modal retrieval
+  quickstart_feast.py        # Feast feature store: build repo → materialise → feature_ref requests → Chronos forecasts
+  quickstart_modal.py        # Modal serverless deployment with Chronos
   sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
   test_api.py
   test_tabular_api.py
   test_server.py       # ModelBackend async dispatch, AnyRequest union, registry
+  test_feast_resolver.py               # FeastResolver unit tests + _build_asgi_app Feast integration (12 tests)
+  test_modal_server.py                 # ModalServer / _build_asgi_app tests (via TestClient)
   test_whisper_backend.py              # WhisperBackend mocked tests (8 tests)
   test_faster_whisper_backend.py       # FasterWhisperBackend mocked tests (9 tests)
   test_bark_backend.py                 # BarkBackend mocked tests (9 tests)
@@ -132,6 +139,7 @@ tests/
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
+  test_smoke_feast.py                  # Feast end-to-end: SQLite store, materialise, resolve, predict (SHEAF_SMOKE_TEST=1)
 ```
 
 ## Architecture
@@ -220,6 +228,6 @@ CI runs lint + tests on Python 3.10, 3.11, 3.12 via GitHub Actions.
 ## What's intentionally deferred
 
 - Sphinx / mkdocs: deferred until the API surface stabilizes further
-- Feast resolver: `feature_ref` field exists in `TimeSeriesRequest` but the resolver is not implemented
 - `bucket_by` batching: `BatchPolicy.bucket_by` field exists but grouping requests by horizon (or other field) before batching is not yet implemented
 - `BatchPolicy` via `ModelServer.run()`: batch parameters are wired in `__init__` via setters; there is no separate `.options()` API for this in Ray Serve
+- PyPI republish: current PyPI package is v0.1.0; `examples/quickstart_modal.py` uses `add_local_python_source("sheaf")` as a workaround until a new release is cut

@@ -31,10 +31,14 @@ pip install "sheaf-serve[tts]"                    # + Bark
 pip install "sheaf-serve[vision]"                 # + DINOv2 / OpenCLIP / SAM2 / Depth Anything / DETR
 pip install "sheaf-serve[earth-observation]"      # + Prithvi
 pip install "sheaf-serve[weather]"                # + GraphCast
+pip install "sheaf-serve[feast]"                  # + Feast feature store integration
+pip install "sheaf-serve[modal]"                  # + Modal serverless deployment
 pip install "sheaf-serve[all]"                    # everything
 ```
 
 ## Quickstart
+
+**Direct backend inference:**
 
 ```python
 from sheaf.api.time_series import Frequency, OutputMode, TimeSeriesRequest
@@ -57,7 +61,61 @@ response = backend.predict(req)
 # response.mean, response.quantiles
 ```
 
-See [`examples/`](examples/) for time series comparison (Chronos vs TimesFM) and tabular classification/regression.
+**Ray Serve (production, autoscaling):**
+
+```python
+from sheaf import ModelServer
+from sheaf.spec import ModelSpec, ResourceConfig
+from sheaf.api.base import ModelType
+
+server = ModelServer(models=[
+    ModelSpec(
+        name="chronos",
+        model_type=ModelType.TIME_SERIES,
+        backend="chronos2",
+        backend_kwargs={"model_id": "amazon/chronos-bolt-small"},
+        resources=ResourceConfig(num_gpus=1),
+    ),
+])
+server.run()  # POST /chronos/predict, GET /chronos/health
+```
+
+**Feast feature store (resolve features at request time):**
+
+```python
+# ModelSpec wires Feast — no history needed in the request
+spec = ModelSpec(
+    name="chronos",
+    model_type=ModelType.TIME_SERIES,
+    backend="chronos2",
+    feast_repo_path="/feast/feature_repo",
+)
+
+# Client sends feature_ref instead of raw history
+{
+    "model_type": "time_series",
+    "model_name": "chronos",
+    "feature_ref": {
+        "feature_view": "asset_prices",
+        "feature_name": "close_history_30d",
+        "entity_key": "ticker",
+        "entity_value": "AAPL"
+    },
+    "horizon": 7,
+    "frequency": "1d"
+}
+```
+
+**Modal (serverless, zero-infra):**
+
+```python
+from sheaf import ModalServer
+
+server = ModalServer(models=[spec], app_name="my-sheaf", gpu="A10G")
+app = server.app  # modal deploy my_server.py
+```
+
+See [`examples/`](examples/) for time series comparison, tabular, audio, vision, and the Feast feature store quickstart.
 
 ---
 
@@ -80,6 +138,9 @@ See [`examples/`](examples/) for time series comparison (Chronos vs TimesFM) and
 | Materials science | ✅ v0.3 | MACE-MP-0 |
 | Earth observation | ✅ v0.3 | Prithvi (IBM/NASA) |
 | Weather forecasting | ✅ v0.3 | GraphCast |
+| Cross-modal embeddings | ✅ v0.3 | ImageBind (text, vision, audio, depth, thermal) |
+| Feast feature store | ✅ v0.3 | Any Feast online store (SQLite, Redis, DynamoDB, …) |
+| Modal serverless | ✅ v0.3 | `ModalServer` — zero-infra GPU deployment |
 | Diffusion / image gen | 🔜 v0.4 | FLUX |
 | Neural operators | 🔜 v0.4 | FNO, DeepONet |
 | Video understanding | 🔜 v0.4 | VideoMAE, TimeSformer |
@@ -96,7 +157,7 @@ See [`examples/`](examples/) for time series comparison (Chronos vs TimesFM) and
 - [x] Model hot-swap without restart (`ModelServer.update()`)
 - [x] Container-friendly auth for TabPFN v2 (`TABPFN_TOKEN` env var)
 
-**v0.3 — model types (complete)**
+**v0.3 — model types + integrations (complete)**
 - [x] ESM-3 protein embeddings
 - [x] Nucleotide Transformer genomics embeddings
 - [x] MolFormer-XL small molecule embeddings
@@ -111,7 +172,9 @@ See [`examples/`](examples/) for time series comparison (Chronos vs TimesFM) and
 - [x] DETR / RT-DETR object detection
 - [x] Prithvi earth observation embeddings
 - [x] GraphCast weather forecasting
-- [ ] Feast feature resolver end-to-end
+- [x] ImageBind cross-modal embeddings (text, vision, audio, depth, thermal)
+- [x] Feast feature store integration (`feature_ref` in requests, `FeastResolver`, `feast_repo_path` on `ModelSpec`)
+- [x] Modal serverless deployment (`ModalServer` — zero-infra alternative to Ray Serve)
 
 **v0.4 — generation + video**
 - [ ] FLUX diffusion / image generation
