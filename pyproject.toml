@@ -93,6 +93,10 @@ diffusion = [
     "torch>=2.0.0",
     "transformers>=4.37.0",  # diffusers depends on transformers for text encoders
 ]
+video = [
+    "transformers>=4.40.0",  # VideoMAE AutoModel support
+    "torch>=2.0.0",
+]
 feast = [
     "feast>=0.40.0",
 ]

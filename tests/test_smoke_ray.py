@@ -38,6 +38,7 @@ from tests.stubs import (
     SmokeTabularBackend,
     SmokeTimeSeriesBackend,
     SmokeTTSBackend,
+    SmokeVideoBackend,
     SmokeWeatherBackend,
 )
 
@@ -211,6 +212,13 @@ def urls():
         backend_cls=SmokeDiffusionBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    video_spec = ModelSpec(
+        name="smoke-video",
+        model_type=ModelType.VIDEO,
+        backend="_smoke_video",
+        backend_cls=SmokeVideoBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -232,6 +240,7 @@ def urls():
             tabular_spec,
             tts_spec,
             diffusion_spec,
+            video_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -270,6 +279,7 @@ def urls():
         ("smoke-tabular", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tabular"),
         ("smoke-tts", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts"),
         ("smoke-diffusion", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-diffusion"),
+        ("smoke-video", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-video"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -303,6 +313,7 @@ def urls():
         "tabular": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tabular",
         "tts": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts",
         "diffusion": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-diffusion",
+        "video": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-video",
         "server": server,
     }
 
@@ -797,6 +808,42 @@ def test_diffusion_predict(urls: dict) -> None:
     assert body["width"] == 64
     png_bytes = base64.b64decode(body["image_b64"])
     assert png_bytes[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_video_predict_embedding(urls: dict) -> None:
+    """VideoRequest (embedding) routes correctly; embedding vector returned."""
+    url = urls["video"]
+    frame_b64 = base64.b64encode(b"fake-frame").decode()
+    payload = {
+        "model_type": "video",
+        "model_name": "smoke-video",
+        "frames_b64": [frame_b64] * 4,
+        "task": "embedding",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["task"] == "embedding"
+    assert body["dim"] == 768
+    assert len(body["embedding"]) == 768
+
+
+def test_video_predict_classification(urls: dict) -> None:
+    """VideoRequest (classification) routes correctly; labels and scores returned."""
+    url = urls["video"]
+    frame_b64 = base64.b64encode(b"fake-frame").decode()
+    payload = {
+        "model_type": "video",
+        "model_name": "smoke-video",
+        "frames_b64": [frame_b64] * 4,
+        "task": "classification",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["task"] == "classification"
+    assert len(body["labels"]) == len(body["scores"])
+    assert body["scores"][0] == pytest.approx(0.8)
 
 
 def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:

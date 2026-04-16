@@ -17,6 +17,7 @@ class ModelType(StrEnum):
     GEOSPATIAL = "geospatial"
     WEATHER = "weather"
     DIFFUSION = "diffusion"
+    VIDEO = "video"
     NEURAL_OPERATOR = "neural_operator"
     AUDIO = "audio"
     AUDIO_GENERATION = "audio_generation"

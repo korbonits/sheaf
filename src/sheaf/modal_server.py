@@ -64,6 +64,7 @@ from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.small_molecule import SmallMoleculeRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
+from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
 from sheaf.spec import ModelSpec
 
@@ -84,7 +85,8 @@ AnyRequest = Annotated[
     | WeatherRequest
     | SatelliteRequest
     | MultimodalEmbeddingRequest
-    | DiffusionRequest,
+    | DiffusionRequest
+    | VideoRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -130,6 +132,7 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
     import sheaf.backends.sam2  # noqa: F401
     import sheaf.backends.tabpfn  # noqa: F401
     import sheaf.backends.timesfm  # noqa: F401
+    import sheaf.backends.videomae  # noqa: F401
     import sheaf.backends.whisper  # noqa: F401
 
     for _mod in _os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):

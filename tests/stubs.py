@@ -29,6 +29,7 @@ from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
 from sheaf.api.small_molecule import SmallMoleculeRequest, SmallMoleculeResponse
 from sheaf.api.tabular import TabularRequest, TabularResponse
 from sheaf.api.time_series import TimeSeriesRequest, TimeSeriesResponse
+from sheaf.api.video import VideoRequest, VideoResponse
 from sheaf.api.weather import WeatherRequest, WeatherResponse
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import register_backend
@@ -512,4 +513,34 @@ class SmokeTTSBackend(ModelBackend):
             model_name=request.model_name,
             audio_b64=base64.b64encode(wav_bytes).decode(),
             sample_rate=24000,
+        )
+
+
+@register_backend("_smoke_video")
+class SmokeVideoBackend(ModelBackend):
+    """Returns fixed 768-dim zero embedding or dummy classification for any clip."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.VIDEO
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, VideoRequest)
+        if request.task == "classification":
+            return VideoResponse(
+                request_id=request.request_id,
+                model_name=request.model_name,
+                task="classification",
+                labels=["running", "jumping", "swimming"],
+                scores=[0.8, 0.15, 0.05],
+            )
+        return VideoResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            task="embedding",
+            embedding=[0.0] * 768,
+            dim=768,
         )

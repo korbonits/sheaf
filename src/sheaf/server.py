@@ -35,6 +35,7 @@ import sheaf.backends.prithvi  # noqa: F401
 import sheaf.backends.sam2  # noqa: F401
 import sheaf.backends.tabpfn  # noqa: F401
 import sheaf.backends.timesfm  # noqa: F401
+import sheaf.backends.videomae  # noqa: F401
 import sheaf.backends.whisper  # noqa: F401
 from sheaf.api.audio import AudioRequest, TTSRequest
 from sheaf.api.audio_generation import AudioGenerationRequest
@@ -52,6 +53,7 @@ from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.small_molecule import SmallMoleculeRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
+from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
 from sheaf.backends.base import ModelBackend
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
@@ -84,7 +86,8 @@ AnyRequest = Annotated[
     | WeatherRequest
     | SatelliteRequest
     | MultimodalEmbeddingRequest
-    | DiffusionRequest,
+    | DiffusionRequest
+    | VideoRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -131,6 +134,7 @@ class _SheafDeployment:
         import sheaf.backends.sam2  # noqa: F401
         import sheaf.backends.tabpfn  # noqa: F401
         import sheaf.backends.timesfm  # noqa: F401
+        import sheaf.backends.videomae  # noqa: F401
         import sheaf.backends.whisper  # noqa: F401
 
         for _mod in os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):
