@@ -30,6 +30,7 @@ from tests.stubs import (
     SmokeGenomicBackend,
     SmokeMaterialsBackend,
     SmokeMolecularBackend,
+    SmokeMultimodalEmbeddingBackend,
     SmokeSatelliteBackend,
     SmokeSegmentationBackend,
     SmokeSmallMoleculeBackend,
@@ -179,6 +180,13 @@ def urls():
         backend_cls=SmokeAudioGenerationBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    multimodal_spec = ModelSpec(
+        name="smoke-multimodal",
+        model_type=ModelType.MULTIMODAL_EMBEDDING,
+        backend="_smoke_multimodal",
+        backend_cls=SmokeMultimodalEmbeddingBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -196,6 +204,7 @@ def urls():
             materials_spec,
             small_mol_spec,
             audio_gen_spec,
+            multimodal_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -227,6 +236,10 @@ def urls():
             "smoke-audio-generation",
             f"http://127.0.0.1:{_SMOKE_PORT}/smoke-audio-generation",
         ),
+        (
+            "smoke-multimodal",
+            f"http://127.0.0.1:{_SMOKE_PORT}/smoke-multimodal",
+        ),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -256,6 +269,7 @@ def urls():
         "materials": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-materials",
         "small_molecule": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-small-molecule",
         "audio_generation": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-audio-generation",
+        "multimodal": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-multimodal",
         "server": server,
     }
 
@@ -671,6 +685,23 @@ def test_audio_generation_predict(urls: dict) -> None:
     wav_bytes = base64.b64decode(body["audio_b64"])
     assert wav_bytes[:4] == b"RIFF"
     assert wav_bytes[8:12] == b"WAVE"
+
+
+def test_multimodal_embedding_predict(urls: dict) -> None:
+    """MultimodalEmbeddingRequest routes correctly; embeddings returned per text."""
+    url = urls["multimodal"]
+    payload = {
+        "model_type": "multimodal_embedding",
+        "model_name": "smoke-multimodal",
+        "texts": ["a photo of a dog", "a photo of a cat"],
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["dim"] == 4
+    assert body["modality"] == "text"
+    assert len(body["embeddings"]) == 2
+    assert len(body["embeddings"][0]) == 4
 
 
 def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:

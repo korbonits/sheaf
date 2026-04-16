@@ -18,6 +18,10 @@ from sheaf.api.embedding import EmbeddingRequest, EmbeddingResponse
 from sheaf.api.genomic import GenomicRequest, GenomicResponse
 from sheaf.api.materials import MaterialsRequest, MaterialsResponse
 from sheaf.api.molecular import MolecularRequest, MolecularResponse
+from sheaf.api.multimodal_embedding import (
+    MultimodalEmbeddingRequest,
+    MultimodalEmbeddingResponse,
+)
 from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
 from sheaf.api.small_molecule import SmallMoleculeRequest, SmallMoleculeResponse
@@ -357,6 +361,29 @@ class SmokeAudioGenerationBackend(ModelBackend):
             audio_b64=base64.b64encode(wav_bytes).decode(),
             sampling_rate=32000,
             duration_s=n_samples / 32000,
+        )
+
+
+@register_backend("_smoke_multimodal")
+class SmokeMultimodalEmbeddingBackend(ModelBackend):
+    """Returns fixed 4-dim zero embeddings for each input item."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.MULTIMODAL_EMBEDDING
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, MultimodalEmbeddingRequest)
+        n = request.n_items
+        return MultimodalEmbeddingResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            embeddings=[[0.0, 0.0, 0.0, 0.0]] * n,
+            dim=4,
+            modality=request.modality,
         )
 
 

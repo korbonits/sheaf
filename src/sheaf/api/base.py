@@ -22,6 +22,7 @@ class ModelType(StrEnum):
     AUDIO_GENERATION = "audio_generation"
     TTS = "tts"
     EMBEDDING = "embedding"
+    MULTIMODAL_EMBEDDING = "multimodal_embedding"
     SEGMENTATION = "segmentation"
     DEPTH = "depth"
     DETECTION = "detection"

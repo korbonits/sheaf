@@ -23,6 +23,7 @@ import sheaf.backends.dinov2  # noqa: F401
 import sheaf.backends.esm3  # noqa: F401
 import sheaf.backends.faster_whisper  # noqa: F401
 import sheaf.backends.graphcast  # noqa: F401
+import sheaf.backends.imagebind  # noqa: F401
 import sheaf.backends.mace  # noqa: F401
 import sheaf.backends.moirai  # noqa: F401
 import sheaf.backends.molformer  # noqa: F401
@@ -43,6 +44,7 @@ from sheaf.api.embedding import EmbeddingRequest
 from sheaf.api.genomic import GenomicRequest
 from sheaf.api.materials import MaterialsRequest
 from sheaf.api.molecular import MolecularRequest
+from sheaf.api.multimodal_embedding import MultimodalEmbeddingRequest
 from sheaf.api.satellite import SatelliteRequest
 from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.small_molecule import SmallMoleculeRequest
@@ -78,7 +80,8 @@ AnyRequest = Annotated[
     | DepthRequest
     | DetectionRequest
     | WeatherRequest
-    | SatelliteRequest,
+    | SatelliteRequest
+    | MultimodalEmbeddingRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -113,6 +116,7 @@ class _SheafDeployment:
         import sheaf.backends.esm3  # noqa: F401
         import sheaf.backends.faster_whisper  # noqa: F401
         import sheaf.backends.graphcast  # noqa: F401
+        import sheaf.backends.imagebind  # noqa: F401
         import sheaf.backends.mace  # noqa: F401
         import sheaf.backends.moirai  # noqa: F401
         import sheaf.backends.molformer  # noqa: F401
