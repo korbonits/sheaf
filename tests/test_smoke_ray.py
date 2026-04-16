@@ -26,6 +26,7 @@ from tests.stubs import (
     SmokeAudioGenerationBackend,
     SmokeDepthBackend,
     SmokeDetectionBackend,
+    SmokeDiffusionBackend,
     SmokeEmbeddingBackend,
     SmokeGenomicBackend,
     SmokeMaterialsBackend,
@@ -203,6 +204,13 @@ def urls():
         backend_cls=SmokeTTSBackend,
         resources=ResourceConfig(num_cpus=1, replicas=1),
     )
+    diffusion_spec = ModelSpec(
+        name="smoke-diffusion",
+        model_type=ModelType.DIFFUSION,
+        backend="_smoke_diffusion",
+        backend_cls=SmokeDiffusionBackend,
+        resources=ResourceConfig(num_cpus=1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -223,6 +231,7 @@ def urls():
             multimodal_spec,
             tabular_spec,
             tts_spec,
+            diffusion_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -260,6 +269,7 @@ def urls():
         ),
         ("smoke-tabular", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tabular"),
         ("smoke-tts", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts"),
+        ("smoke-diffusion", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-diffusion"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -292,6 +302,7 @@ def urls():
         "multimodal": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-multimodal",
         "tabular": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tabular",
         "tts": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts",
+        "diffusion": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-diffusion",
         "server": server,
     }
 
@@ -765,6 +776,27 @@ def test_tts_predict(urls: dict) -> None:
     wav_bytes = base64.b64decode(body["audio_b64"])
     assert wav_bytes[:4] == b"RIFF"
     assert wav_bytes[8:12] == b"WAVE"
+
+
+def test_diffusion_predict(urls: dict) -> None:
+    """DiffusionRequest routes correctly; PNG image returned."""
+    url = urls["diffusion"]
+    payload = {
+        "model_type": "diffusion",
+        "model_name": "smoke-diffusion",
+        "prompt": "a serene mountain landscape",
+        "height": 64,
+        "width": 64,
+        "seed": 42,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["seed"] == 42
+    assert body["height"] == 64
+    assert body["width"] == 64
+    png_bytes = base64.b64decode(body["image_b64"])
+    assert png_bytes[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:

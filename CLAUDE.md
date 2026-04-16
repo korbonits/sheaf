@@ -46,8 +46,10 @@ PyPI: `pip install sheaf-serve`
 - Ray Serve smoke coverage: all modalities have end-to-end smoke tests in `test_smoke_ray.py`
 - Feast smoke coverage: real SQLite store, materialise → resolve → predict; 8 tests in `test_smoke_feast.py`; gated on `SHEAF_SMOKE_TEST=1`
 
-**v0.4 targets:**
-- FLUX diffusion / image generation
+**What works (v0.4, in progress):**
+- Image diffusion: FLUX backend (`diffusers.FluxPipeline`) — FLUX.1-schnell (4 steps, guidance=0, Apache 2.0) and FLUX.1-dev (20-50 steps, guidance=3.5-7.0); `DiffusionRequest` → `DiffusionResponse` with base64-encoded PNG; bfloat16 by default; optional `enable_model_cpu_offload` for low-VRAM GPUs; seed returned in response for reproducibility; 17 mocked tests in `test_flux_backend.py`; install with `pip install 'sheaf-serve[diffusion]'`
+
+**v0.4 remaining:**
 - VideoMAE / TimeSformer video understanding
 
 ## Repo layout
@@ -75,6 +77,7 @@ src/sheaf/
     materials.py       # MaterialsRequest/Response (MACE)
     satellite.py       # SatelliteRequest/Response (Prithvi)
     weather.py         # WeatherRequest/Response (GraphCast)
+    diffusion.py       # DiffusionRequest/Response (FLUX)
   backends/
     base.py            # ModelBackend ABC: load(), predict(), async_predict(), batch_predict()
     chronos.py         # Chronos2Backend — Chronos-Bolt + Chronos-T5 families
@@ -97,6 +100,7 @@ src/sheaf/
     graphcast.py       # GraphCastBackend — weather forecasting via google-deepmind/graphcast (JAX/Haiku)
     prithvi.py         # PrithviBackend — IBM/NASA Prithvi-EO geospatial embeddings (trust_remote_code=True)
     imagebind.py       # ImageBindBackend — cross-modal embeddings (text/vision/audio/depth/thermal); imagebind not on PyPI
+    flux.py            # FluxBackend — FLUX.1-schnell / FLUX.1-dev image diffusion via diffusers.FluxPipeline
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
@@ -136,6 +140,7 @@ tests/
   test_graphcast_backend.py            # GraphCastBackend mocked tests (16 tests)
   test_prithvi_backend.py              # PrithviBackend mocked tests (14 tests)
   test_imagebind_backend.py            # ImageBindBackend mocked tests (20 tests)
+  test_flux_backend.py                 # FluxBackend mocked tests (17 tests)
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
@@ -192,6 +197,9 @@ tests/
 - **ImageBind temp files** — imagebind data loaders accept file paths, not in-memory buffers. `ImageBindBackend._build_inputs()` writes base64-decoded bytes to `tempfile.mkstemp()` files and passes the paths to loaders. `_remove_files()` is called in a `finally` block after inference, so cleanup happens even on exceptions.
 - **ImageBind modality exclusivity** — `MultimodalEmbeddingRequest` accepts exactly one of: `texts`, `images_b64`, `audios_b64`, `depth_images_b64`, `thermal_images_b64`. Validated by `@model_validator`. A single request batches all items within a modality.
 - **ImageBind MagicMock side_effect pattern** — in tests, `model.side_effect = _forward` (not `model.__call__ = ...`) is the correct way to override MagicMock call behavior. Python looks up special methods on the type, not the instance — setting `__call__` on a MagicMock instance has no effect.
+- **FLUX pipeline call chain** — `FluxPipeline.from_pretrained(model_id, torch_dtype=...).to(device)` returns the pipeline instance. Calling `pipeline(prompt=..., ...)` returns an object with `.images[0]` being a PIL image. Mock chain in tests: `pipeline_cls.from_pretrained.return_value.to.return_value = instance` and `instance.return_value.images = [fake_img]`.
+- **FLUX dtype resolution** — `torch_dtype` is stored as a string (`"bfloat16"`) at `__init__` time; resolved to the actual `torch.dtype` inside `load()` via a dict lookup. This avoids importing torch at construction time.
+- **FLUX CPU offload** — when `enable_model_cpu_offload=True`, `pipeline.enable_model_cpu_offload()` is called on the pre-`.to()` pipeline object (not the instance). `.to(device)` is skipped in this path. Tests assert `instance.to.assert_not_called()`.
 
 ## Adding a new backend
 
