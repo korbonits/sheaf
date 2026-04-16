@@ -64,7 +64,10 @@ _audio_image = (
 # ---------------------------------------------------------------------------
 
 
-@app.cls(image=_ts_image, gpu="T4", min_containers=1)
+_hf_secret = modal.Secret.from_name("huggingface")
+
+
+@app.cls(image=_ts_image, gpu="T4", min_containers=1, secrets=[_hf_secret])
 class ChronosForecaster:
     @modal.enter()
     def load(self) -> None:
@@ -109,7 +112,7 @@ _tabpfn_secret = modal.Secret.from_dict(
 )
 
 
-@app.cls(image=_tab_image, secrets=[_tabpfn_secret], min_containers=1)
+@app.cls(image=_tab_image, secrets=[_tabpfn_secret, _hf_secret], min_containers=1)
 class TabularClassifier:
     @modal.enter()
     def load(self) -> None:
@@ -143,7 +146,7 @@ class TabularClassifier:
 # ---------------------------------------------------------------------------
 
 
-@app.cls(image=_audio_image, gpu="T4", min_containers=1)
+@app.cls(image=_audio_image, gpu="T4", min_containers=1, secrets=[_hf_secret])
 class Transcriber:
     @modal.enter()
     def load(self) -> None:
