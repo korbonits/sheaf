@@ -18,6 +18,7 @@ from ray import serve
 import sheaf.backends.bark  # noqa: F401
 import sheaf.backends.chronos  # noqa: F401
 import sheaf.backends.depth_anything  # noqa: F401
+import sheaf.backends.detr  # noqa: F401
 import sheaf.backends.dinov2  # noqa: F401
 import sheaf.backends.esm3  # noqa: F401
 import sheaf.backends.faster_whisper  # noqa: F401
@@ -30,6 +31,7 @@ import sheaf.backends.whisper  # noqa: F401
 from sheaf.api.audio import AudioRequest, TTSRequest
 from sheaf.api.base import BaseRequest
 from sheaf.api.depth import DepthRequest
+from sheaf.api.detection import DetectionRequest
 from sheaf.api.embedding import EmbeddingRequest
 from sheaf.api.molecular import MolecularRequest
 from sheaf.api.segmentation import SegmentationRequest
@@ -57,7 +59,8 @@ AnyRequest = Annotated[
     | EmbeddingRequest
     | SegmentationRequest
     | MolecularRequest
-    | DepthRequest,
+    | DepthRequest
+    | DetectionRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -87,6 +90,7 @@ class _SheafDeployment:
         import sheaf.backends.bark  # noqa: F401
         import sheaf.backends.chronos  # noqa: F401
         import sheaf.backends.depth_anything  # noqa: F401
+        import sheaf.backends.detr  # noqa: F401
         import sheaf.backends.dinov2  # noqa: F401
         import sheaf.backends.esm3  # noqa: F401
         import sheaf.backends.faster_whisper  # noqa: F401

@@ -19,6 +19,7 @@ class ModelType(str, Enum):
     EMBEDDING = "embedding"
     SEGMENTATION = "segmentation"
     DEPTH = "depth"
+    DETECTION = "detection"
 
 
 class BaseRequest(BaseModel):
