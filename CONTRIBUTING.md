@@ -24,13 +24,13 @@ Each new model type needs:
 The time series contract (`src/sheaf/api/time_series.py`) and Chronos2 backend (`src/sheaf/backends/chronos.py`) are the reference implementation. Follow that pattern.
 
 **Wanted backends (in priority order):**
-- ESM-3 (`molecular`)
-- Whisper (`audio`)
-- GraphCast (`geospatial`)
+- FLUX (`diffusion`) — image generation via diffusers
+- VideoMAE / TimeSformer (`video`) — video understanding / classification
+- Feast feature resolver — end-to-end `feature_ref` resolution in `TimeSeriesRequest`
 
 ### API contract feedback
 
-If you have strong opinions about what a molecular, audio, or geospatial request should look like — open an issue. Getting the contracts right before building the optimizations behind them is the priority at this stage.
+If you have strong opinions about what a request/response contract should look like for a new modality — open an issue. Getting the contracts right before building the optimizations behind them is the priority at this stage.
 
 ### Bug reports
 
@@ -72,6 +72,32 @@ class MyModelBackend(ModelBackend):
 ```
 
 Then add your model's optional dependencies to `pyproject.toml` under `[project.optional-dependencies]`.
+
+## Implemented backends (v0.3)
+
+All backends below are implemented, tested, and wired into the Ray Serve smoke suite:
+
+| Backend | Registry key | Install extra | Notes |
+|---|---|---|---|
+| Chronos2 | `chronos` | `time-series` | Chronos-Bolt and Chronos-T5 families |
+| TimesFM | `timesfm` | `time-series` | Google TimesFM |
+| Moirai | `moirai` | `moirai` | Salesforce Moirai (uni2ts) |
+| TabPFN | `tabpfn` | `tabular` | Classification + regression; requires `TABPFN_TOKEN` |
+| Whisper | `whisper` | `audio` | openai-whisper (PyTorch) |
+| FasterWhisper | `faster_whisper` | `audio` | CTranslate2; no torch at inference |
+| MusicGen | `musicgen` | `audio-generation` | Meta MusicGen; text → audio |
+| Bark | `bark` | `tts` | Suno Bark via transformers |
+| OpenCLIP | `open_clip` | `vision` | Image and text embeddings |
+| DINOv2 | `dinov2` | `vision` | Image embeddings; CLS or mean pooling |
+| SAM2 | `sam2` | `vision` | Prompted segmentation |
+| DepthAnything | `depth_anything` | `vision` | Monocular depth estimation |
+| DETR | `detr` | `vision` | Object detection; any `AutoModelForObjectDetection` |
+| ESM-3 | `esm3` | `molecular` | Protein embeddings; Python 3.12+ |
+| NucleotideTransformer | `nucleotide_transformer` | `genomics` | DNA/RNA embeddings |
+| MolFormer | `molformer` | `small-molecule` | Small molecule SMILES embeddings |
+| MACE | `mace` | `materials` | Universal interatomic potential (energy, forces, stress) |
+| Prithvi | `prithvi` | `earth-observation` | IBM/NASA geospatial embeddings |
+| GraphCast | `graphcast` | `weather` | Google DeepMind weather forecasting |
 
 ## Code style
 

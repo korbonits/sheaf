@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.2 (complete) / v0.3 (in progress)
+## Current state: v0.2 (complete) / v0.3 (complete except Feast)
 
 **What works (v0.2):**
 - Time series: Chronos2, TimesFM, and Moirai backends, full quantile/sample/mean output modes; multivariate support
@@ -23,8 +23,9 @@ PyPI: `pip install sheaf-serve`
 - `backend_cls` field on `ModelSpec`: pass a class directly (cloudpickled) instead of a registry name
 - Container-friendly TabPFN auth: `load()` uses tabpfn's full token resolution order (env var → `~/.cache/tabpfn/auth_token` → `~/.tabpfn/token`); sets `TABPFN_NO_BROWSER=1` automatically; `TabPFNLicenseError` at fit-time is re-raised as `OSError`
 
-**What works (v0.3 in progress):**
+**What works (v0.3):**
 - Audio: Whisper backend (`openai-whisper`) and faster-whisper backend (`faster-whisper` / CTranslate2) — transcription, translation, word timestamps, VAD filter, language probability; WAV decoded inline (no ffmpeg needed for WAV inputs); install with `pip install 'sheaf-serve[audio]'`
+- Audio generation: MusicGen backend (`facebook/musicgen-*`) via HuggingFace `transformers.MusicgenForConditionalGeneration` — text-conditioned music/audio generation; `AudioGenerationRequest` → `AudioGenerationResponse`; mono/stereo support; `max_new_tokens = int(duration_s * frame_rate)`; outputs base64-encoded 16-bit PCM WAV at 32kHz; install with `pip install 'sheaf-serve[audio-generation]'`
 - TTS: Bark backend (`suno/bark-small`, `suno/bark`) via HuggingFace `transformers.BarkModel` — text-to-speech with optional voice presets; outputs base64-encoded 16-bit PCM WAV at 24kHz; install with `pip install 'sheaf-serve[tts]'`
 - Vision embeddings: OpenCLIP backend (`open-clip-torch`) — image and text embeddings via CLIP/SigLIP/EVA-CLIP; `EmbeddingRequest` accepts `texts` or `images_b64` (mutually exclusive); L2-normalized by default; install with `pip install 'sheaf-serve[vision]'`
 - Vision embeddings: DINOv2 backend (`transformers`) — image-only CLS or mean-pooled embeddings; install with `pip install 'sheaf-serve[vision]'`
@@ -32,13 +33,20 @@ PyPI: `pip install sheaf-serve`
 - Depth estimation: Depth Anything v2 backend (`transformers`) — monocular depth estimation; returns base64-encoded float32 depth map + min/max; install with `pip install 'sheaf-serve[vision]'`
 - Object detection: DETR/RT-DETR backend (`transformers`) — any `AutoModelForObjectDetection`-compatible model; returns boxes in `[x1,y1,x2,y2]` pixel coords, class labels, scores; install with `pip install 'sheaf-serve[vision]'`
 - Molecular embeddings: ESM-3 backend (`esm>=3.0.0`) — protein sequence embeddings via EvolutionaryScale ESM-3; CLS or mean pooling; **Python 3.12+ required**; install with `pip install 'sheaf-serve[molecular]'`
+- Genomics embeddings: Nucleotide Transformer backend (`transformers`) — DNA/RNA sequence embeddings via InstaDeepAI/EMBL-EBI Nucleotide Transformer v2; 6-mer tokenization; mean pooling excludes CLS/EOS; install with `pip install 'sheaf-serve[genomics]'`
+- Small molecule embeddings: MolFormer backend (`transformers`, `trust_remote_code=True`) — SMILES embeddings via IBM MolFormer-XL; batched tokenization with attention-masked mean pooling; install with `pip install 'sheaf-serve[small-molecule]'`
+- Materials science: MACE backend (`mace-torch`) — universal interatomic potential via MACE-MP-0; energy, forces, and optional stress via ASE `Atoms` interface; install with `pip install 'sheaf-serve[materials]'`
 - Weather forecasting: GraphCast backend (`graphcast`, `dm-haiku`, `jax`, `xarray`) — autoregressive n-step rollout from ERA5 surface+atmospheric fields; checkpoint loaded from `.npz`; install with `pip install 'sheaf-serve[weather]'`
 - Earth observation: Prithvi backend (`transformers`, `torch`) — IBM/NASA Prithvi-EO geospatial embeddings via `AutoModel` + `AutoImageProcessor` with `trust_remote_code=True`; `SatelliteRequest` accepts `(n_time, n_bands, H, W)` float32 pixels; per-band z-score normalization; CLS and mean pooling; install with `pip install 'sheaf-serve[earth-observation]'`
 - TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` + `predict()` against the live library; 8 tests in `test_tabpfn_integration.py`
-- Ray Serve smoke coverage: all 10 modalities (time_series, tabular, audio, tts, embedding, segmentation, molecular, depth, detection, geospatial) now have end-to-end smoke tests in `test_smoke_ray.py`
+- Ray Serve smoke coverage: all modalities have end-to-end smoke tests in `test_smoke_ray.py`
 
-**v0.3 remaining targets:**
+**v0.3 remaining:**
 - Feast feature resolver end-to-end
+
+**v0.4 targets:**
+- FLUX diffusion / image generation
+- VideoMAE / TimeSformer video understanding
 
 ## Repo layout
 
@@ -52,6 +60,18 @@ src/sheaf/
     base.py            # BaseRequest, BaseResponse, ModelType enum
     time_series.py     # TimeSeriesRequest/Response, Frequency, OutputMode
     tabular.py         # TabularRequest/Response
+    audio.py           # AudioRequest/Response, TTSRequest/TTSResponse
+    audio_generation.py # AudioGenerationRequest/Response (MusicGen)
+    embedding.py       # EmbeddingRequest/Response
+    segmentation.py    # SegmentationRequest/Response
+    depth.py           # DepthRequest/Response
+    detection.py       # DetectionRequest/Response
+    molecular.py       # MolecularRequest/Response (ESM-3)
+    genomic.py         # GenomicRequest/Response (Nucleotide Transformer)
+    small_molecule.py  # SmallMoleculeRequest/Response (MolFormer)
+    materials.py       # MaterialsRequest/Response (MACE)
+    satellite.py       # SatelliteRequest/Response (Prithvi)
+    weather.py         # WeatherRequest/Response (GraphCast)
   backends/
     base.py            # ModelBackend ABC: load(), predict(), async_predict(), batch_predict()
     chronos.py         # Chronos2Backend — Chronos-Bolt + Chronos-T5 families
@@ -61,12 +81,16 @@ src/sheaf/
     whisper.py         # WhisperBackend — openai-whisper (PyTorch)
     faster_whisper.py  # FasterWhisperBackend — faster-whisper (CTranslate2, no torch at runtime)
     bark.py            # BarkBackend — Bark TTS via HuggingFace transformers
+    musicgen.py        # MusicGenBackend — MusicGen audio generation via HuggingFace transformers
     open_clip.py       # OpenCLIPBackend — image/text embeddings via open-clip-torch
     dinov2.py          # DINOv2Backend — image-only embeddings via HuggingFace transformers (CLS or mean pooling)
     sam2.py            # SAM2Backend — prompted image segmentation via sam2 library
     depth_anything.py  # DepthAnythingBackend — monocular depth estimation via transformers
     detr.py            # DETRBackend — object detection via DETR/RT-DETR (AutoModelForObjectDetection)
     esm3.py            # ESM3Backend — protein sequence embeddings via EvolutionaryScale esm (Python 3.12+)
+    nucleotide_transformer.py  # NucleotideTransformerBackend — DNA/RNA embeddings via transformers
+    molformer.py       # MolFormerBackend — SMILES embeddings via IBM MolFormer-XL (trust_remote_code=True)
+    mace.py            # MACEBackend — MACE-MP-0 universal interatomic potential via ASE
     graphcast.py       # GraphCastBackend — weather forecasting via google-deepmind/graphcast (JAX/Haiku)
     prithvi.py         # PrithviBackend — IBM/NASA Prithvi-EO geospatial embeddings (trust_remote_code=True)
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
@@ -86,20 +110,24 @@ tests/
   test_api.py
   test_tabular_api.py
   test_server.py       # ModelBackend async dispatch, AnyRequest union, registry
-  test_whisper_backend.py         # WhisperBackend mocked tests (8 tests)
-  test_faster_whisper_backend.py  # FasterWhisperBackend mocked tests (9 tests)
-  test_bark_backend.py            # BarkBackend mocked tests (9 tests)
-  test_open_clip_backend.py       # OpenCLIPBackend mocked tests (12 tests)
-  test_dinov2_backend.py          # DINOv2Backend mocked tests (10 tests)
-  test_sam2_backend.py            # SAM2Backend mocked tests (11 tests)
-  test_depth_anything_backend.py  # DepthAnythingBackend mocked tests (10 tests)
-  test_detr_backend.py            # DETRBackend mocked tests (11 tests)
-  test_esm3_backend.py            # ESM3Backend mocked tests (10 tests)
-  test_graphcast_backend.py       # GraphCastBackend mocked tests (16 tests)
-  test_prithvi_backend.py         # PrithviBackend mocked tests (14 tests)
-  test_tabpfn_integration.py      # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
-  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all 10 modalities
-  test_smoke_whisper.py           # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
+  test_whisper_backend.py              # WhisperBackend mocked tests (8 tests)
+  test_faster_whisper_backend.py       # FasterWhisperBackend mocked tests (9 tests)
+  test_bark_backend.py                 # BarkBackend mocked tests (9 tests)
+  test_musicgen_backend.py             # MusicGenBackend mocked tests (14 tests)
+  test_open_clip_backend.py            # OpenCLIPBackend mocked tests (12 tests)
+  test_dinov2_backend.py               # DINOv2Backend mocked tests (10 tests)
+  test_sam2_backend.py                 # SAM2Backend mocked tests (11 tests)
+  test_depth_anything_backend.py       # DepthAnythingBackend mocked tests (10 tests)
+  test_detr_backend.py                 # DETRBackend mocked tests (11 tests)
+  test_esm3_backend.py                 # ESM3Backend mocked tests (10 tests)
+  test_nucleotide_transformer_backend.py  # NucleotideTransformerBackend mocked tests (13 tests)
+  test_molformer_backend.py            # MolFormerBackend mocked tests (14 tests)
+  test_mace_backend.py                 # MACEBackend mocked tests (13 tests)
+  test_graphcast_backend.py            # GraphCastBackend mocked tests (16 tests)
+  test_prithvi_backend.py              # PrithviBackend mocked tests (14 tests)
+  test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
+  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
+  test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
 ```
 
 ## Architecture
@@ -130,12 +158,16 @@ tests/
 - **TabPFN per-request fit** — TabPFN is an in-context learner. `batch_predict` runs each request independently (different context tables per request). Future: batch query rows against same context table.
 - **faster-whisper lazy generator** — `WhisperModel.transcribe()` returns `(segments_generator, info)`. The generator must be fully consumed before `info` fields (language, duration) are reliable. `FasterWhisperBackend._run()` consumes it immediately in a list comprehension. Do not partially iterate.
 - **WAV without ffmpeg** — `_audio_utils.decode_audio()` parses RIFF/WAV directly to float32 numpy at 16kHz for 16/32-bit PCM. Non-WAV formats fall back to a named temp file (calling backend passes the path; the model invokes ffmpeg internally).
-- **WAV encoding** — `_audio_utils.encode_wav()` encodes a float32 numpy array to 16-bit PCM WAV bytes (pure numpy/struct, no scipy). Used by `BarkBackend` to produce the `audio_b64` response field.
-- **TTS vs ASR model_type** — `TTSRequest`/`TTSResponse` use `ModelType.TTS = "tts"`, distinct from `ModelType.AUDIO = "audio"` used by Whisper/faster-whisper. Both are in `AnyRequest` discriminated union.
+- **WAV encoding** — `_audio_utils.encode_wav()` encodes a float32 numpy array to 16-bit PCM WAV bytes (pure numpy/struct, no scipy). Used by `BarkBackend` and `MusicGenBackend` to produce the `audio_b64` response field.
+- **TTS vs ASR vs audio generation model_type** — `TTSRequest`/`TTSResponse` use `ModelType.TTS = "tts"`; `AudioGenerationRequest`/`AudioGenerationResponse` use `ModelType.AUDIO_GENERATION = "audio_generation"`; Whisper/faster-whisper use `ModelType.AUDIO = "audio"`. All three are in `AnyRequest` discriminated union.
+- **MusicGen frame rate** — `max_new_tokens = int(duration_s * model.config.audio_encoder.frame_rate)` (frame_rate=50 tokens/sec for MusicGen). Audio output shape is `(1, n_channels, T)`; `[0]` gives `(n_channels, T)`; mono: `[0][0]`; stereo: `mean(axis=0)`.
 - **OpenCLIP mutually exclusive inputs** — `EmbeddingRequest` accepts either `texts: list[str]` or `images_b64: list[str]`, never both. Validated by `@model_validator`. A single request batches multiple items; `batch_predict` runs requests sequentially.
 - **PIL stored at load() time** — `OpenCLIPBackend._Image` and `DINOv2Backend._Image` are set to `PIL.Image` during `load()` so tests can inject a mock without PIL installed in the test environment.
 - **DINOv2 pooling strategies** — `DINOv2Backend` supports `pooling="cls"` (CLS token at `last_hidden_state[:, 0, :]`, default) and `pooling="mean"` (mean of patch tokens at `[:, 1:, :]`). Image-only; raises `ValueError` on `texts` input.
 - **ESM-3 pooling strategies** — `ESM3Backend` supports `pooling="mean"` (mean of residue hidden states at positions `1:-1`, excluding BOS/EOS, default) and `pooling="cls"` (BOS token at position 0). Requires Python 3.12+ and HuggingFace Hub login with EvolutionaryScale license accepted.
+- **Nucleotide Transformer 6-mer tokenization** — sequences are processed one at a time; mean pooling excludes CLS (pos 0) and EOS (pos -1) via `hidden[:, 1:-1, :]`.
+- **MolFormer attention-masked mean pooling** — tokenizes the entire batch at once with `padding=True`; masked mean: `(hidden * mask_exp).sum(dim=1) / mask_exp.sum(dim=1)` where `mask_exp = attention_mask.unsqueeze(-1).float()`.
+- **MACE ASE Atoms interface** — `self._Atoms` is stored at `load()` time (like `self._Image` in vision backends) for test injectability. Tests inject `FakeAtoms` class that captures constructor kwargs.
 - **SAM2 mask encoding** — `SegmentationResponse.masks_b64` are base64-encoded flat uint8 byte arrays. Decode with `np.frombuffer(base64.b64decode(m), dtype=np.uint8).reshape(height, width).astype(bool)`.
 - **Depth Anything normalization** — `DepthRequest.normalize=True` (default) maps raw depth to `[0, 1]` via `(d - min) / range`. `DepthResponse.depth_b64` is a base64-encoded flat float32 byte array; reshape with `np.frombuffer(..., dtype=np.float32).reshape(height, width)`.
 - **DETR target_sizes ordering** — PIL `.size` returns `(W, H)` but `post_process_object_detection` requires `target_sizes=[(H, W)]`. The backend unpacks as `img_width, img_height = img.size` and reverses for the call.

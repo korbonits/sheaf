@@ -18,11 +18,20 @@ Each model type gets a typed request/response contract. Batching, caching, and s
 ## Install
 
 ```bash
-pip install sheaf-serve                        # core only
-pip install "sheaf-serve[time-series]"         # + Chronos2 / TimesFM
-pip install "sheaf-serve[tabular]"             # + TabPFN
-pip install "sheaf-serve[molecular]"           # + ESM-3
-pip install "sheaf-serve[all]"                 # everything
+pip install sheaf-serve                           # core only
+pip install "sheaf-serve[time-series]"            # + Chronos2 / TimesFM / Moirai
+pip install "sheaf-serve[tabular]"                # + TabPFN
+pip install "sheaf-serve[molecular]"              # + ESM-3  (Python 3.12+)
+pip install "sheaf-serve[genomics]"               # + Nucleotide Transformer
+pip install "sheaf-serve[small-molecule]"         # + MolFormer
+pip install "sheaf-serve[materials]"              # + MACE-MP
+pip install "sheaf-serve[audio]"                  # + Whisper / faster-whisper
+pip install "sheaf-serve[audio-generation]"       # + MusicGen
+pip install "sheaf-serve[tts]"                    # + Bark
+pip install "sheaf-serve[vision]"                 # + DINOv2 / OpenCLIP / SAM2 / Depth Anything / DETR
+pip install "sheaf-serve[earth-observation]"      # + Prithvi
+pip install "sheaf-serve[weather]"                # + GraphCast
+pip install "sheaf-serve[all]"                    # everything
 ```
 
 ## Quickstart
@@ -56,32 +65,57 @@ See [`examples/`](examples/) for time series comparison (Chronos vs TimesFM) and
 
 | Type | Status | Backends |
 |---|---|---|
-| Time series | ✅ v0.1 | Chronos, Chronos-Bolt, TimesFM |
-| Tabular | ✅ v0.1 | TabPFN |
-| Molecular / biological | 🔜 v0.3 | ESM-3, AlphaFold |
-| Audio | 🔜 v0.3 | Whisper, MusicGen |
-| Embeddings | 🔜 v0.3 | CLIP, ColBERT |
-| Geospatial / Earth science | 🔜 v0.3 | GraphCast, Clay |
-| Diffusion | 🔜 v0.4 | Flux, Stable Diffusion |
+| Time series | ✅ v0.1 | Chronos2, Chronos-Bolt, TimesFM, Moirai |
+| Tabular | ✅ v0.1 | TabPFN v2 |
+| Audio transcription | ✅ v0.3 | Whisper, faster-whisper |
+| Audio generation | ✅ v0.3 | MusicGen |
+| Text-to-speech | ✅ v0.3 | Bark |
+| Vision embeddings | ✅ v0.3 | OpenCLIP, DINOv2 |
+| Segmentation | ✅ v0.3 | SAM2 |
+| Depth estimation | ✅ v0.3 | Depth Anything v2 |
+| Object detection | ✅ v0.3 | DETR / RT-DETR |
+| Protein / molecular | ✅ v0.3 | ESM-3 (Python 3.12+) |
+| Genomics | ✅ v0.3 | Nucleotide Transformer |
+| Small molecule | ✅ v0.3 | MolFormer-XL |
+| Materials science | ✅ v0.3 | MACE-MP-0 |
+| Earth observation | ✅ v0.3 | Prithvi (IBM/NASA) |
+| Weather forecasting | ✅ v0.3 | GraphCast |
+| Diffusion / image gen | 🔜 v0.4 | FLUX |
 | Neural operators | 🔜 v0.4 | FNO, DeepONet |
+| Video understanding | 🔜 v0.4 | VideoMAE, TimeSformer |
 
 ## Roadmap to production
 
-**v0.2 — serving layer**
+**v0.2 — serving layer (complete)**
 - [x] Ray Serve integration tested end-to-end
 - [x] Async `predict()` handlers
 - [x] HTTP API with proper request validation (422 on bad input)
 - [x] Health check and readiness probe endpoints
 - [x] Batching scheduler (BatchPolicy wired into `@serve.batch` per deployment)
-- [ ] Basic error handling at the service boundary
-- [ ] Model hot-swap without restart
-- [ ] Container-friendly auth for TabPFN v2 (TABPFN_TOKEN env var works, but first-run browser flow breaks in headless environments)
+- [x] Error handling at the service boundary (backend exceptions → structured HTTP 500)
+- [x] Model hot-swap without restart (`ModelServer.update()`)
+- [x] Container-friendly auth for TabPFN v2 (`TABPFN_TOKEN` env var)
 
-**v0.3 — model types**
-- [ ] ESM-3 / molecular backend
-- [ ] Audio backend (Whisper)
-- [ ] Geospatial backend (GraphCast)
-- [ ] Feast feature resolver implemented end-to-end
+**v0.3 — model types (complete)**
+- [x] ESM-3 protein embeddings
+- [x] Nucleotide Transformer genomics embeddings
+- [x] MolFormer-XL small molecule embeddings
+- [x] MACE-MP-0 materials (energy, forces, stress)
+- [x] Whisper / faster-whisper audio transcription
+- [x] MusicGen audio generation
+- [x] Bark text-to-speech
+- [x] OpenCLIP image/text embeddings
+- [x] DINOv2 image embeddings
+- [x] SAM2 segmentation
+- [x] Depth Anything v2 depth estimation
+- [x] DETR / RT-DETR object detection
+- [x] Prithvi earth observation embeddings
+- [x] GraphCast weather forecasting
+- [ ] Feast feature resolver end-to-end
+
+**v0.4 — generation + video**
+- [ ] FLUX diffusion / image generation
+- [ ] VideoMAE / TimeSformer video understanding
 
 ---
 
