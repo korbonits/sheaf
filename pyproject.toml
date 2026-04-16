@@ -35,6 +35,9 @@ time-series = [
 tabular = [
     "tabpfn>=2.0.0",
 ]
+moirai = [
+    "uni2ts>=2.0.0",
+]
 molecular = [
     "fair-esm>=2.0.0",
 ]
@@ -53,7 +56,7 @@ dev = [
     "pre-commit>=3.7.0",
 ]
 all = [
-    "sheaf-serve[time-series,tabular,molecular,feast,milvus]",
+    "sheaf-serve[time-series,tabular,moirai,molecular,feast,milvus]",
 ]
 
 [tool.hatch.build.targets.wheel]
