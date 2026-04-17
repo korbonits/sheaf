@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import os
 import time
@@ -10,6 +11,7 @@ from typing import Annotated, Any, cast
 
 import ray
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import Field
 from ray import serve
 
@@ -331,6 +333,59 @@ class _SheafDeployment:
                     status_code=500,
                     detail=f"{type(exc).__name__}: {exc}",
                 ) from exc
+
+    @_app.post("/stream")
+    async def stream(self, request: AnyRequest) -> StreamingResponse:
+        """Stream inference events via Server-Sent Events (SSE).
+
+        Returns a ``text/event-stream`` response.  Each event is a JSON object
+        on a ``data: <json>\\n\\n`` line.  Two event shapes:
+
+        - Progress: ``{"type": "progress", "step": N, "total_steps": N, "done": false}``
+        - Result:   ``{"type": "result", "done": true, ...response_fields}``
+
+        Bypasses batching and the response cache — each stream is per-request.
+        Feast feature resolution runs identically to ``/predict``.
+        """
+        if request.model_type != self._spec.model_type:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Backend '{self._spec.name}' expects "
+                    f"model_type='{self._spec.model_type}', "
+                    f"got '{request.model_type}'"
+                ),
+            )
+
+        _feature_ref = getattr(request, "feature_ref", None)
+        if _feature_ref is not None:
+            if self._feast is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Request contains feature_ref but ModelSpec "
+                        f"'{self._spec.name}' has no feast_repo_path configured."
+                    ),
+                )
+            try:
+                history = self._feast.resolve(_feature_ref)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Feast resolution failed: {type(exc).__name__}: {exc}",
+                ) from exc
+            request = request.model_copy(
+                update={"history": history, "feature_ref": None}
+            )
+
+        async def _sse() -> Any:
+            try:
+                async for event in self._backend.stream_predict(request):
+                    yield f"data: {json.dumps(event)}\n\n"
+            except Exception as exc:
+                yield f"data: {json.dumps({'type': 'error', 'error': str(exc)})}\n\n"
+
+        return StreamingResponse(_sse(), media_type="text/event-stream")
 
     @serve.batch(max_batch_size=32, batch_wait_timeout_s=0.05)
     async def _batch_predict(self, requests: list[BaseRequest]) -> list[dict[str, Any]]:

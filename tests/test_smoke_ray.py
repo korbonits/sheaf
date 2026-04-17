@@ -860,6 +860,32 @@ def test_wrong_model_type_for_embedding_returns_422(urls: dict) -> None:
     assert r.status_code == 422
 
 
+def test_stream_sse(serving_url: str) -> None:
+    """POST /stream returns SSE with a result event."""
+    import json as _json
+
+    payload = {
+        "model_type": "time_series",
+        "model_name": "smoke-ts",
+        "history": [1.0, 2.0, 3.0],
+        "horizon": 3,
+        "frequency": "1h",
+    }
+    with requests.post(f"{serving_url}/stream", json=payload, stream=True) as resp:
+        assert resp.status_code == 200
+        assert "text/event-stream" in resp.headers.get("content-type", "")
+        events = []
+        for raw in resp.iter_lines():
+            line = raw.decode() if isinstance(raw, bytes) else raw
+            if line.startswith("data: "):
+                events.append(_json.loads(line[6:]))
+
+    result_events = [e for e in events if e.get("type") == "result"]
+    assert len(result_events) == 1
+    assert result_events[0]["done"] is True
+    assert result_events[0]["mean"] == [0.42, 0.42, 0.42]
+
+
 def test_hot_swap(serving_url: str, model_server) -> None:  # type: ignore[type-arg]
     """server.update() replaces a deployment in place with no URL change.
 

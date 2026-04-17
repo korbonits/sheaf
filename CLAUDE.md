@@ -52,8 +52,9 @@ PyPI: `pip install sheaf-serve`
 
 **What works (v0.5 Ops/DX — in progress):**
 - Structured JSON logging: `sheaf.logging.JsonFormatter` + `configure_logging()`; gated by `SHEAF_LOG_JSON=1`; request_id / latency_ms / status in every predict log line; 15 tests in `test_logging.py`
-- Prometheus metrics: `sheaf.metrics` module — `sheaf_requests_total`, `sheaf_request_duration_seconds`, `sheaf_batch_size_total`, `sheaf_backend_load_seconds`; `GET /metrics` per deployment; lazy import, `SHEAF_METRICS_DISABLED=1` guard; 337 tests passing; install with `pip install 'sheaf-serve[metrics]'`
+- Prometheus metrics: `sheaf.metrics` module — `sheaf_requests_total`, `sheaf_request_duration_seconds`, `sheaf_batch_size_total`, `sheaf_backend_load_seconds`; `GET /metrics` per deployment; lazy import, `SHEAF_METRICS_DISABLED=1` guard; install with `pip install 'sheaf-serve[metrics]'`
 - OpenTelemetry tracing: `sheaf.tracing` module — `sheaf.predict` span per request with sub-spans for Feast resolution (`sheaf.feast.resolve`) and backend inference (`sheaf.backend.infer`); `configure_tracing()` auto-configures SDK from `OTEL_EXPORTER_OTLP_ENDPOINT` or `SHEAF_OTEL_CONSOLE=1`; lazy import, `SHEAF_TRACING_DISABLED=1` guard, `_NoopTracer`/`_NoopSpan` shims when OTel absent; 24 tests in `test_tracing.py`; install with `pip install 'sheaf-serve[tracing]'`
+- Streaming responses: `POST /{name}/stream` → SSE (`text/event-stream`); `ModelBackend.stream_predict()` async generator (default: single result event); `FluxBackend` overrides with per-step progress events via `threading.Queue` + `callback_on_step_end`; 21 tests in `test_streaming.py`
 
 ## Repo layout
 
@@ -130,6 +131,7 @@ examples/
   quickstart_video.py        # VideoMAE embeddings (CLS + mean pooling) + action classification
   quickstart_video_modal.py  # VideoMAE on Modal (T4): embed + classify synthetic clips
   quickstart_cache.py        # Request caching: CacheConfig on ModelSpec, timing first vs. cached call
+  quickstart_streaming.py    # SSE streaming: default (single result) and progressive (progress events) backends
   sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
@@ -161,8 +163,9 @@ tests/
   test_logging.py                      # JsonFormatter + configure_logging + server integration (15 tests)
   test_metrics.py                      # Prometheus metrics module (no-op absent/disabled + functional, 11+ tests)
   test_tracing.py                      # OTel tracing: NoopSpan/Tracer, configure_tracing, span attributes (24 tests)
+  test_streaming.py                    # stream_predict default, FluxBackend SSE events, POST /{name}/stream endpoint (21 tests)
+  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities + /stream SSE
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
-  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
   test_smoke_feast.py                  # Feast end-to-end: SQLite store, materialise, resolve, predict (SHEAF_SMOKE_TEST=1)
 ```
@@ -238,6 +241,10 @@ tests/
 - **Cache placement — after Feast resolution** — the cache lookup and store happen after Feast feature resolution, inside the `trace_predict` span, before `_batch_predict`. This means the cache key reflects the actual history values (not a feature reference), so two requests for the same entity key at different times (with different resolved feature values) correctly produce distinct entries. The same placement applies in `modal_server.py`'s predict handler.
 - **Cache store — dict, not response object** — `ResponseCache` stores `dict[str, Any]` (the `model_dump(mode="json")` output), not the Pydantic response object. This matches what the predict handler returns to FastAPI and avoids a second serialisation round-trip on cache hits.
 - **`ResponseCache` is never cloudpickled** — `self._cache` is assigned in `_SheafDeployment.__init__`, which runs after `@serve.ingress` deserialises `_app` in the worker. Unlike `register_metrics_endpoint`, there is no cloudpickle hazard here.
+- **`stream_predict` async generator** — `ModelBackend.stream_predict(request)` is an async generator that yields event dicts. Default implementation yields one `{"type": "result", "done": True, ...response}` event after `async_predict()` completes. Backends override this for chunked output.
+- **FLUX streaming via `threading.Queue`** — `FluxBackend.stream_predict` runs `_run()` in a thread-pool executor via `loop.run_in_executor()`. A `queue.Queue` (thread-safe) bridges the synchronous `callback_on_step_end` (called in the executor thread) to the async generator (running in the event loop thread). Progress events are drained via `q.get_nowait()` / `asyncio.sleep(0.02)` polling while `future.done()` is False, then drained once more after the future completes to avoid race conditions.
+- **`POST /{name}/stream` bypasses batching and cache** — streaming responses are per-request by nature; they cannot be batched (the SSE body is produced incrementally) or meaningfully cached (the stream is ephemeral). The endpoint Feast-resolves identically to `/predict`, then calls `backend.stream_predict()` directly. Errors mid-stream yield a `{"type": "error", "error": "..."}` event instead of crashing the SSE response.
+- **SSE wire format** — each event is a `data: {json}\n\n` line (standard HTML Server-Sent Events spec). Clients parse by stripping the `data: ` prefix and JSON-decoding the rest.
 
 ## Adding a new backend
 
@@ -274,5 +281,4 @@ CI runs lint + tests on Python 3.11, 3.12 via GitHub Actions.
 ## What's intentionally deferred
 
 - Sphinx / mkdocs: deferred until the API surface stabilizes further
-- `bucket_by` batching: `BatchPolicy.bucket_by` field exists but grouping requests by horizon (or other field) before batching is not yet implemented
 - `BatchPolicy` via `ModelServer.run()`: batch parameters are wired in `__init__` via setters; there is no separate `.options()` API for this in Ray Serve

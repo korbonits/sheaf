@@ -189,7 +189,7 @@ Ops / DX:
 - [x] OpenTelemetry traces through the request path
 
 Serving / infra:
-- [ ] Streaming responses (token-by-token latency for diffusion and TTS)
+- [x] Streaming responses (`POST /{name}/stream` → SSE; FLUX emits per-step progress events)
 - [x] Request caching (`CacheConfig` on `ModelSpec` — in-process LRU, optional TTL)
 - [x] `bucket_by` batching — group requests by field value before `@serve.batch`
 

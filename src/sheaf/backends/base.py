@@ -2,6 +2,8 @@
 
 import asyncio
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from sheaf.api.base import BaseRequest, BaseResponse
 
@@ -51,6 +53,24 @@ class ModelBackend(ABC):
         """
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.batch_predict, requests)
+
+    async def stream_predict(
+        self, request: BaseRequest
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Stream inference events for a single request.
+
+        Default implementation runs predict() and yields a single result event.
+        Override in backends that support chunked or progressive output
+        (e.g. diffusion step-end callbacks, TTS phoneme tokens).
+
+        Yields:
+            Event dicts with at least ``"type"`` and ``"done"`` keys:
+
+            - Progress: ``{"type": "progress", "step": N, "total_steps": N}``
+            - Result:   ``{"type": "result", "done": true, ...response_fields}``
+        """
+        result = await self.async_predict(request)
+        yield {"type": "result", "done": True, **result.model_dump(mode="json")}
 
     @property
     @abstractmethod
