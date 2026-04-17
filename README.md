@@ -200,6 +200,31 @@ New model types:
 - [ ] Multimodal generation — text+image-conditioned (SDXL, CogVideoX)
 - [ ] Speech synthesis with fine-grained control (StyleTTS2, Kokoro)
 
+**v0.6 — batch inference + async jobs**
+
+The goal: cover every shape of production inference, not just synchronous HTTP.
+
+Offline / batch:
+- [ ] `BatchRunner` — same backend, same typed contract, offline batch mode; Ray Data substrate for distributed execution, checkpointing, and output sinks (S3, Delta Lake, BigQuery)
+- [ ] `BatchSpec` — mirrors `ModelSpec` with source/sink config; reuses all existing backends without modification
+
+Async job queue:
+- [ ] `SheafWorker` — queue-consumer pattern for long-running inference (Redis Streams, SQS, Kafka); decouples clients from compute for jobs where HTTP request/response is the wrong shape (FLUX 50-step, GraphCast multi-day rollouts)
+- [ ] Job lifecycle: enqueue → processing → result / dead-letter; webhook on completion
+- [ ] Priority lanes + per-tenant fair queuing
+
+**v0.7 — adapter multiplexing + client SDK**
+
+Adapter multiplexing:
+- [ ] LoRA / adapter hot-swap per request — one GPU deployment serves many fine-tunes; `adapters` dict on `ModelSpec`, `adapter_id` field in requests
+- [ ] Adapter registry: load on demand, LRU eviction when VRAM is tight
+- [ ] First targets: FLUX (style LoRAs), Whisper (language adapters), ESM-3 (task heads)
+
+Client SDK:
+- [ ] `pip install sheaf-client` — typed Python client generated from request/response schemas
+- [ ] Async client (`httpx`-backed); retry + timeout; streams SSE natively
+- [ ] Language-agnostic: publish OpenAPI spec so teams can generate clients in any language
+
 ---
 
 ## Architecture
