@@ -66,6 +66,7 @@ from sheaf.metrics import (
     time_load,
 )
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
+from sheaf.scheduling.batch import bucket_requests
 from sheaf.spec import ModelSpec
 from sheaf.tracing import configure_tracing, record_exception, trace_predict, trace_span
 
@@ -340,10 +341,29 @@ class _SheafDeployment:
 
         The decorator defaults (32 / 50 ms) are overridden per deployment by
         __init__ using the ModelSpec.batch_policy values.
+
+        When ``batch_policy.bucket_by`` is set, requests are grouped by the
+        value of that field before being dispatched to the backend, so each
+        ``async_batch_predict`` call receives a homogeneous sub-batch.  This
+        avoids forced padding when sequences of different lengths land in the
+        same Ray Serve batch window (e.g. time-series requests with different
+        ``horizon`` values, or video requests with different frame counts).
+        Results are reassembled in the original arrival order before return.
         """
         record_batch(self._spec.name, len(requests))
-        responses = await self._backend.async_batch_predict(requests)
-        return [r.model_dump(mode="json") for r in responses]
+        groups = bucket_requests(requests, self._spec.batch_policy.bucket_by)
+        if len(groups) == 1:
+            # Common path: no bucketing, or all requests share the same value.
+            responses = await self._backend.async_batch_predict(groups[0][1])
+            return [r.model_dump(mode="json") for r in responses]
+
+        # Multiple buckets — dispatch each independently, reassemble in order.
+        slot: dict[int, dict[str, Any]] = {}
+        for indices, sub_reqs in groups:
+            bucket_responses = await self._backend.async_batch_predict(sub_reqs)
+            for idx, resp in zip(indices, bucket_responses):
+                slot[idx] = resp.model_dump(mode="json")
+        return [slot[i] for i in range(len(requests))]
 
 
 class ModelServer:

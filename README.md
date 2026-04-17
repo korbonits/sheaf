@@ -191,7 +191,7 @@ Ops / DX:
 Serving / infra:
 - [ ] Streaming responses (token-by-token latency for diffusion and TTS)
 - [x] Request caching (`CacheConfig` on `ModelSpec` — in-process LRU, optional TTL)
-- [ ] `bucket_by` batching — group requests by horizon/length before `@serve.batch`
+- [x] `bucket_by` batching — group requests by field value before `@serve.batch`
 
 New model types:
 - [ ] LiDAR / 3D point cloud (PointNet++, OpenShape)

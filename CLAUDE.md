@@ -111,7 +111,7 @@ src/sheaf/
     videomae.py        # VideoMAEBackend — video embeddings + classification via VideoMAE / TimeSformer
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
-    batch.py           # BatchPolicy — wired into @serve.batch per deployment
+    batch.py           # BatchPolicy + bucket_requests() — wired into @serve.batch per deployment
   cache/
     __init__.py        # CacheConfig + ResponseCache — in-process LRU with optional TTL (SHEAF_CACHE_DISABLED=1)
   integrations/
@@ -156,6 +156,7 @@ tests/
   test_imagebind_backend.py            # ImageBindBackend mocked tests (20 tests)
   test_flux_backend.py                 # FluxBackend mocked tests (17 tests)
   test_videomae_backend.py             # VideoMAEBackend mocked tests (17 tests)
+  test_bucket_by.py                    # BatchPolicy, bucket_requests (grouping/ordering), and dispatch integration (18 tests)
   test_cache.py                        # CacheConfig, ResponseCache (LRU/TTL/key), and _build_asgi_app integration (27 tests)
   test_logging.py                      # JsonFormatter + configure_logging + server integration (15 tests)
   test_metrics.py                      # Prometheus metrics module (no-op absent/disabled + functional, 11+ tests)
@@ -231,6 +232,7 @@ tests/
 - **OTel tracing singleton** — `trace.set_tracer_provider()` is a one-time operation per process; subsequent calls are silently ignored by OTel. `configure_tracing()` is idempotent by checking `isinstance(current, SdkTracerProvider)` before setting. Tests that test span creation use `monkeypatch.setattr(t, "get_tracer", lambda: local_provider.get_tracer("sheaf"))` with a `TracerProvider` + `InMemorySpanExporter` to bypass global state; tests that verify `configure_tracing()` mock `trace.set_tracer_provider` and `trace.get_tracer_provider` instead.
 - **OTel tracing spans** — `sheaf.predict` outer span wraps the full request; sub-spans `sheaf.feast.resolve` and `sheaf.backend.infer` are emitted via `trace_span()`. `trace_predict()` does not auto-record exceptions (call `record_exception(span, exc)` explicitly in the `except` block before raising `HTTPException`) so the original exception is captured, not the wrapping HTTP exception. `record_exception()` guards the `StatusCode` import so call sites don't need OTel installed.
 - **OTel `configure_tracing()` env vars** — `OTEL_EXPORTER_OTLP_ENDPOINT` triggers OTLP/HTTP exporter (appends `/v1/traces`); `SHEAF_OTEL_CONSOLE=1` triggers `ConsoleSpanExporter` (dev/CI). If neither is set, `configure_tracing()` returns immediately without initialising the SDK (zero overhead). `OTEL_SERVICE_NAME` overrides the service name resource attribute.
+- **`bucket_by` batching — sub-batch within a Ray Serve batch window** — `BatchPolicy.bucket_by` names a scalar field (e.g. `"horizon"` for time series, `"n_frames"` for video). `bucket_requests(requests, bucket_by)` in `scheduling/batch.py` groups the list into `(original_indices, sub_requests)` pairs, one per unique field value, preserving arrival order within each bucket. `_batch_predict` dispatches one `async_batch_predict` call per group and reassembles results in original order via a `slot: dict[int, ...]` index map. `modal_server.py` handles requests one at a time (no `@serve.batch`), so `bucket_by` has no effect there and is silently ignored. Requests lacking the field are grouped under the `None` bucket.
 - **Request cache — opt-in per deployment** — `ModelSpec.cache = CacheConfig(enabled=True)` attaches an in-process LRU `ResponseCache` to that deployment. Default is `enabled=False` (no overhead). `SHEAF_CACHE_DISABLED=1` skips all caches process-wide regardless of spec config (useful in integration test runs where you want to exercise the backend every time).
 - **Cache key design** — `ResponseCache.make_key(deployment, request)` serialises the request via `model_dump(mode="json", exclude={"request_id", ...})`, prepends the deployment name (so two specs with identical input types share no entries), JSON-canonicalises with `sort_keys=True`, then SHA-256 hashes. `request_id` is always excluded (it is unique per call). Additional fields can be excluded via `CacheConfig.exclude_fields` (e.g. `["seed"]` for diffusion models where different seeds should be distinct cache entries but you still want same-seed repeats to hit).
 - **Cache placement — after Feast resolution** — the cache lookup and store happen after Feast feature resolution, inside the `trace_predict` span, before `_batch_predict`. This means the cache key reflects the actual history values (not a feature reference), so two requests for the same entity key at different times (with different resolved feature values) correctly produce distinct entries. The same placement applies in `modal_server.py`'s predict handler.
