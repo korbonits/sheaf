@@ -112,7 +112,8 @@ src/sheaf/
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy — wired into @serve.batch per deployment
-  cache/               # stub
+  cache/
+    __init__.py        # CacheConfig + ResponseCache — in-process LRU with optional TTL (SHEAF_CACHE_DISABLED=1)
   integrations/
     __init__.py        # exports FeastResolver
     feast.py           # FeastResolver — wraps feast.FeatureStore, resolves FeatureRef → list[float]
@@ -128,6 +129,7 @@ examples/
   quickstart_diffusion_modal.py  # FLUX on Modal (T4): local-source workaround, tiny-flux-pipe for CI
   quickstart_video.py        # VideoMAE embeddings (CLS + mean pooling) + action classification
   quickstart_video_modal.py  # VideoMAE on Modal (T4): embed + classify synthetic clips
+  quickstart_cache.py        # Request caching: CacheConfig on ModelSpec, timing first vs. cached call
   sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
@@ -154,6 +156,7 @@ tests/
   test_imagebind_backend.py            # ImageBindBackend mocked tests (20 tests)
   test_flux_backend.py                 # FluxBackend mocked tests (17 tests)
   test_videomae_backend.py             # VideoMAEBackend mocked tests (17 tests)
+  test_cache.py                        # CacheConfig, ResponseCache (LRU/TTL/key), and _build_asgi_app integration (27 tests)
   test_logging.py                      # JsonFormatter + configure_logging + server integration (15 tests)
   test_metrics.py                      # Prometheus metrics module (no-op absent/disabled + functional, 11+ tests)
   test_tracing.py                      # OTel tracing: NoopSpan/Tracer, configure_tracing, span attributes (24 tests)
@@ -228,6 +231,11 @@ tests/
 - **OTel tracing singleton** — `trace.set_tracer_provider()` is a one-time operation per process; subsequent calls are silently ignored by OTel. `configure_tracing()` is idempotent by checking `isinstance(current, SdkTracerProvider)` before setting. Tests that test span creation use `monkeypatch.setattr(t, "get_tracer", lambda: local_provider.get_tracer("sheaf"))` with a `TracerProvider` + `InMemorySpanExporter` to bypass global state; tests that verify `configure_tracing()` mock `trace.set_tracer_provider` and `trace.get_tracer_provider` instead.
 - **OTel tracing spans** — `sheaf.predict` outer span wraps the full request; sub-spans `sheaf.feast.resolve` and `sheaf.backend.infer` are emitted via `trace_span()`. `trace_predict()` does not auto-record exceptions (call `record_exception(span, exc)` explicitly in the `except` block before raising `HTTPException`) so the original exception is captured, not the wrapping HTTP exception. `record_exception()` guards the `StatusCode` import so call sites don't need OTel installed.
 - **OTel `configure_tracing()` env vars** — `OTEL_EXPORTER_OTLP_ENDPOINT` triggers OTLP/HTTP exporter (appends `/v1/traces`); `SHEAF_OTEL_CONSOLE=1` triggers `ConsoleSpanExporter` (dev/CI). If neither is set, `configure_tracing()` returns immediately without initialising the SDK (zero overhead). `OTEL_SERVICE_NAME` overrides the service name resource attribute.
+- **Request cache — opt-in per deployment** — `ModelSpec.cache = CacheConfig(enabled=True)` attaches an in-process LRU `ResponseCache` to that deployment. Default is `enabled=False` (no overhead). `SHEAF_CACHE_DISABLED=1` skips all caches process-wide regardless of spec config (useful in integration test runs where you want to exercise the backend every time).
+- **Cache key design** — `ResponseCache.make_key(deployment, request)` serialises the request via `model_dump(mode="json", exclude={"request_id", ...})`, prepends the deployment name (so two specs with identical input types share no entries), JSON-canonicalises with `sort_keys=True`, then SHA-256 hashes. `request_id` is always excluded (it is unique per call). Additional fields can be excluded via `CacheConfig.exclude_fields` (e.g. `["seed"]` for diffusion models where different seeds should be distinct cache entries but you still want same-seed repeats to hit).
+- **Cache placement — after Feast resolution** — the cache lookup and store happen after Feast feature resolution, inside the `trace_predict` span, before `_batch_predict`. This means the cache key reflects the actual history values (not a feature reference), so two requests for the same entity key at different times (with different resolved feature values) correctly produce distinct entries. The same placement applies in `modal_server.py`'s predict handler.
+- **Cache store — dict, not response object** — `ResponseCache` stores `dict[str, Any]` (the `model_dump(mode="json")` output), not the Pydantic response object. This matches what the predict handler returns to FastAPI and avoids a second serialisation round-trip on cache hits.
+- **`ResponseCache` is never cloudpickled** — `self._cache` is assigned in `_SheafDeployment.__init__`, which runs after `@serve.ingress` deserialises `_app` in the worker. Unlike `register_metrics_endpoint`, there is no cloudpickle hazard here.
 
 ## Adding a new backend
 

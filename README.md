@@ -190,7 +190,7 @@ Ops / DX:
 
 Serving / infra:
 - [ ] Streaming responses (token-by-token latency for diffusion and TTS)
-- [ ] Request caching (`cache/` layer — currently a stub)
+- [x] Request caching (`CacheConfig` on `ModelSpec` — in-process LRU, optional TTL)
 - [ ] `bucket_by` batching — group requests by horizon/length before `@serve.batch`
 
 New model types:
