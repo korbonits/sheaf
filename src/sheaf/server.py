@@ -57,6 +57,8 @@ from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
 from sheaf.backends.base import ModelBackend
+from sheaf.cache import _DISABLED as _CACHE_DISABLED
+from sheaf.cache import ResponseCache
 from sheaf.metrics import (
     record_batch,
     record_predict,
@@ -192,6 +194,11 @@ class _SheafDeployment:
                 spec.feast_repo_path,
             )
 
+        # Response cache — disabled globally if SHEAF_CACHE_DISABLED=1.
+        self._cache: ResponseCache | None = None
+        if not _CACHE_DISABLED and spec.cache.enabled:
+            self._cache = ResponseCache(spec.cache)
+
         # Wire BatchPolicy into the @serve.batch handler.
         # set_max_batch_size / set_batch_wait_timeout_s are the official Ray
         # Serve API for runtime batch parameter updates (see serve.batch docs).
@@ -285,6 +292,14 @@ class _SheafDeployment:
                     update={"history": history, "feature_ref": None}
                 )
 
+            # Cache lookup — after Feast resolution so key reflects actual input.
+            _cache_key: str | None = None
+            if self._cache is not None:
+                _cache_key = self._cache.make_key(self._spec.name, request)
+                _cached = self._cache.get(_cache_key)
+                if _cached is not None:
+                    return _cached
+
             _t0 = time.perf_counter()
             _log_extra: dict[str, object] = {
                 "request_id": str(request.request_id),
@@ -300,6 +315,8 @@ class _SheafDeployment:
                 _log_extra["status"] = "ok"
                 _logger.info("predict ok", extra=_log_extra)
                 record_predict(self._spec.name, request.model_type, "ok", _latency_s)
+                if self._cache is not None and _cache_key is not None:
+                    self._cache.set(_cache_key, result)
                 return result
             except Exception as exc:
                 _latency_s = time.perf_counter() - _t0

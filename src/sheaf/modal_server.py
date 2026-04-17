@@ -67,6 +67,8 @@ from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
+from sheaf.cache import _DISABLED as _CACHE_DISABLED
+from sheaf.cache import ResponseCache
 from sheaf.metrics import record_predict, register_metrics_endpoint, time_load
 from sheaf.spec import ModelSpec
 from sheaf.tracing import configure_tracing, record_exception, trace_predict, trace_span
@@ -181,6 +183,16 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
             },
         )
 
+    # Response caches — one per deployment, None when disabled or not opted-in.
+    _caches: dict[str, ResponseCache | None] = {
+        name: (
+            ResponseCache(spec.cache)
+            if not _CACHE_DISABLED and spec.cache.enabled
+            else None
+        )
+        for name, (spec, _backend, _feast) in _backends.items()
+    }
+
     if _os.environ.get("SHEAF_LOG_JSON"):
         from sheaf.logging import configure_logging
 
@@ -248,6 +260,15 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                     update={"history": history, "feature_ref": None}
                 )
 
+            # Cache lookup — after Feast resolution so key reflects actual input.
+            _cache = _caches.get(name)
+            _cache_key: str | None = None
+            if _cache is not None:
+                _cache_key = _cache.make_key(name, request)
+                _cached = _cache.get(_cache_key)
+                if _cached is not None:
+                    return _cached
+
             _t0 = time.perf_counter()
             _log_extra: dict[str, object] = {
                 "request_id": str(request.request_id),
@@ -263,7 +284,10 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                 _log_extra["status"] = "ok"
                 _logger.info("predict ok", extra=_log_extra)
                 record_predict(name, request.model_type, "ok", _latency_s)
-                return result.model_dump(mode="json")
+                _result_dict = result.model_dump(mode="json")
+                if _cache is not None and _cache_key is not None:
+                    _cache.set(_cache_key, _result_dict)
+                return _result_dict
             except Exception as exc:
                 _latency_s = time.perf_counter() - _t0
                 _log_extra["latency_ms"] = round(_latency_s * 1000, 2)

@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from sheaf.api.base import ModelType
+from sheaf.cache import CacheConfig
 from sheaf.scheduling.batch import BatchPolicy
 
 
@@ -59,5 +60,13 @@ class ModelSpec(BaseModel):
             "Path to a Feast feature repo directory (contains feature_store.yaml). "
             "When set, TimeSeriesRequests that specify feature_ref will have their "
             "history resolved from the online store before inference."
+        ),
+    )
+    cache: CacheConfig = Field(
+        default_factory=CacheConfig,
+        description=(
+            "In-process LRU response cache.  Disabled by default (opt-in). "
+            "Set ``cache=CacheConfig(enabled=True)`` to cache identical requests. "
+            "``SHEAF_CACHE_DISABLED=1`` overrides this at the process level."
         ),
     )
