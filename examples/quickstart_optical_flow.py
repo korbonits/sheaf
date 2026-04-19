@@ -117,7 +117,7 @@ print(
     f"min={dy.min():.2f}  max={dy.max():.2f}"
 )
 print(f"mag mean={mag.mean():.2f}  max={mag.max():.2f}")
-print(f"Expected: dx ≈ {SHIFT:.1f} (rightward shift), dy ≈ 0")
+print(f"Expected: dx ≈ -{SHIFT:.1f} (frame2 shifted right → negative flow), dy ≈ 0")
 
 # ---------------------------------------------------------------------------
 # RAFT-small
