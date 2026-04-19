@@ -61,6 +61,10 @@ from sheaf.api.genomic import GenomicRequest
 from sheaf.api.materials import MaterialsRequest
 from sheaf.api.molecular import MolecularRequest
 from sheaf.api.multimodal_embedding import MultimodalEmbeddingRequest
+from sheaf.api.multimodal_generation import MultimodalGenerationRequest
+from sheaf.api.optical_flow import OpticalFlowRequest
+from sheaf.api.point_cloud import PointCloudRequest
+from sheaf.api.pose import PoseRequest
 from sheaf.api.satellite import SatelliteRequest
 from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.small_molecule import SmallMoleculeRequest
@@ -92,7 +96,11 @@ AnyRequest = Annotated[
     | SatelliteRequest
     | MultimodalEmbeddingRequest
     | DiffusionRequest
-    | VideoRequest,
+    | VideoRequest
+    | PoseRequest
+    | OpticalFlowRequest
+    | MultimodalGenerationRequest
+    | PointCloudRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -128,17 +136,22 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
     import sheaf.backends.flux  # noqa: F401
     import sheaf.backends.graphcast  # noqa: F401
     import sheaf.backends.imagebind  # noqa: F401
+    import sheaf.backends.kokoro  # noqa: F401
     import sheaf.backends.mace  # noqa: F401
     import sheaf.backends.moirai  # noqa: F401
     import sheaf.backends.molformer  # noqa: F401
     import sheaf.backends.musicgen  # noqa: F401
     import sheaf.backends.nucleotide_transformer  # noqa: F401
     import sheaf.backends.open_clip  # noqa: F401
+    import sheaf.backends.pointnet  # noqa: F401
     import sheaf.backends.prithvi  # noqa: F401
+    import sheaf.backends.raft  # noqa: F401
     import sheaf.backends.sam2  # noqa: F401
+    import sheaf.backends.sdxl  # noqa: F401
     import sheaf.backends.tabpfn  # noqa: F401
     import sheaf.backends.timesfm  # noqa: F401
     import sheaf.backends.videomae  # noqa: F401
+    import sheaf.backends.vitpose  # noqa: F401
     import sheaf.backends.whisper  # noqa: F401
 
     for _mod in _os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):

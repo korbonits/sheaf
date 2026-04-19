@@ -29,9 +29,14 @@ from tests.stubs import (
     SmokeDiffusionBackend,
     SmokeEmbeddingBackend,
     SmokeGenomicBackend,
+    SmokeKokoroBackend,
     SmokeMaterialsBackend,
     SmokeMolecularBackend,
     SmokeMultimodalEmbeddingBackend,
+    SmokeMultimodalGenerationBackend,
+    SmokeOpticalFlowBackend,
+    SmokePointCloudBackend,
+    SmokePoseBackend,
     SmokeSatelliteBackend,
     SmokeSegmentationBackend,
     SmokeSmallMoleculeBackend,
@@ -219,6 +224,41 @@ def urls():
         backend_cls=SmokeVideoBackend,
         resources=ResourceConfig(num_cpus=0.1, replicas=1),
     )
+    kokoro_spec = ModelSpec(
+        name="smoke-kokoro",
+        model_type=ModelType.TTS,
+        backend="_smoke_kokoro",
+        backend_cls=SmokeKokoroBackend,
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
+    )
+    pose_spec = ModelSpec(
+        name="smoke-pose",
+        model_type=ModelType.POSE,
+        backend="_smoke_pose",
+        backend_cls=SmokePoseBackend,
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
+    )
+    optical_flow_spec = ModelSpec(
+        name="smoke-optical-flow",
+        model_type=ModelType.OPTICAL_FLOW,
+        backend="_smoke_optical_flow",
+        backend_cls=SmokeOpticalFlowBackend,
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
+    )
+    multimodal_gen_spec = ModelSpec(
+        name="smoke-multimodal-gen",
+        model_type=ModelType.MULTIMODAL_GENERATION,
+        backend="_smoke_multimodal_gen",
+        backend_cls=SmokeMultimodalGenerationBackend,
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
+    )
+    point_cloud_spec = ModelSpec(
+        name="smoke-point-cloud",
+        model_type=ModelType.POINT_CLOUD,
+        backend="_smoke_point_cloud",
+        backend_cls=SmokePointCloudBackend,
+        resources=ResourceConfig(num_cpus=0.1, replicas=1),
+    )
 
     server = ModelServer(
         models=[
@@ -241,6 +281,11 @@ def urls():
             tts_spec,
             diffusion_spec,
             video_spec,
+            kokoro_spec,
+            pose_spec,
+            optical_flow_spec,
+            multimodal_gen_spec,
+            point_cloud_spec,
         ],
         host="127.0.0.1",
         port=_SMOKE_PORT,
@@ -280,6 +325,14 @@ def urls():
         ("smoke-tts", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts"),
         ("smoke-diffusion", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-diffusion"),
         ("smoke-video", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-video"),
+        ("smoke-kokoro", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-kokoro"),
+        ("smoke-pose", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-pose"),
+        ("smoke-optical-flow", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-optical-flow"),
+        (
+            "smoke-multimodal-gen",
+            f"http://127.0.0.1:{_SMOKE_PORT}/smoke-multimodal-gen",
+        ),
+        ("smoke-point-cloud", f"http://127.0.0.1:{_SMOKE_PORT}/smoke-point-cloud"),
     ]:
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -314,6 +367,11 @@ def urls():
         "tts": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-tts",
         "diffusion": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-diffusion",
         "video": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-video",
+        "kokoro": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-kokoro",
+        "pose": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-pose",
+        "optical_flow": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-optical-flow",
+        "multimodal_gen": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-multimodal-gen",
+        "point_cloud": f"http://127.0.0.1:{_SMOKE_PORT}/smoke-point-cloud",
         "server": server,
     }
 
@@ -884,6 +942,128 @@ def test_stream_sse(serving_url: str) -> None:
     assert len(result_events) == 1
     assert result_events[0]["done"] is True
     assert result_events[0]["mean"] == [0.42, 0.42, 0.42]
+
+
+def test_kokoro_predict(urls: dict) -> None:
+    """TTSRequest via Kokoro backend routes correctly; WAV audio returned."""
+    url = urls["kokoro"]
+    payload = {
+        "model_type": "tts",
+        "model_name": "smoke-kokoro",
+        "text": "Hello from Kokoro.",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["sample_rate"] == 24000
+    wav_bytes = base64.b64decode(body["audio_b64"])
+    assert wav_bytes[:4] == b"RIFF"
+    assert wav_bytes[8:12] == b"WAVE"
+
+
+def test_pose_predict(urls: dict) -> None:
+    """PoseRequest routes correctly; poses and keypoint names returned."""
+    url = urls["pose"]
+    payload = {
+        "model_type": "pose",
+        "model_name": "smoke-pose",
+        "image_b64": _FAKE_IMG_B64,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["poses"]) == 1
+    assert len(body["poses"][0]) == 2
+    assert body["poses"][0][0] == pytest.approx([100.0, 200.0, 0.9])
+    assert body["keypoint_names"] == ["nose", "left_eye"]
+    assert body["width"] == 640
+    assert body["height"] == 480
+
+
+def test_optical_flow_predict(urls: dict) -> None:
+    """OpticalFlowRequest routes correctly; flow_b64 returned."""
+    url = urls["optical_flow"]
+    payload = {
+        "model_type": "optical_flow",
+        "model_name": "smoke-optical-flow",
+        "frame1_b64": _FAKE_IMG_B64,
+        "frame2_b64": _FAKE_IMG_B64,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["width"] == 4
+    assert body["height"] == 4
+    import numpy as np
+
+    flow = np.frombuffer(base64.b64decode(body["flow_b64"]), dtype=np.float32).reshape(
+        body["height"], body["width"], 2
+    )
+    assert flow.shape == (4, 4, 2)
+    assert flow.sum() == pytest.approx(0.0)
+
+
+def test_multimodal_generation_predict(urls: dict) -> None:
+    """MultimodalGenerationRequest routes correctly; PNG image returned."""
+    url = urls["multimodal_gen"]
+    payload = {
+        "model_type": "multimodal_generation",
+        "model_name": "smoke-multimodal-gen",
+        "prompt": "a sunset over the ocean",
+        "image_b64": _FAKE_IMG_B64,
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["width"] == 8
+    assert body["height"] == 8
+    png_bytes = base64.b64decode(body["image_b64"])
+    assert png_bytes[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_point_cloud_predict_embed(urls: dict) -> None:
+    """PointCloudRequest (embed) routes correctly; 1024-dim embedding returned."""
+    import numpy as np
+
+    url = urls["point_cloud"]
+    n_points = 1024
+    pts = np.zeros((n_points, 3), dtype=np.float32)
+    payload = {
+        "model_type": "point_cloud",
+        "model_name": "smoke-point-cloud",
+        "points_b64": base64.b64encode(pts.tobytes()).decode(),
+        "n_points": n_points,
+        "task": "embed",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["embedding"] is not None
+    assert len(body["embedding"]) == 1024
+    assert body["label"] is None
+
+
+def test_point_cloud_predict_classify(urls: dict) -> None:
+    """PointCloudRequest (classify) routes correctly; label and scores returned."""
+    import numpy as np
+
+    url = urls["point_cloud"]
+    n_points = 1024
+    pts = np.zeros((n_points, 3), dtype=np.float32)
+    payload = {
+        "model_type": "point_cloud",
+        "model_name": "smoke-point-cloud",
+        "points_b64": base64.b64encode(pts.tobytes()).decode(),
+        "n_points": n_points,
+        "task": "classify",
+    }
+    r = requests.post(f"{url}/predict", json=payload)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["label"] == "airplane"
+    assert len(body["scores"]) == 40
+    assert body["scores"][0] == pytest.approx(0.9)
+    assert body["embedding"] is None
 
 
 def test_hot_swap(serving_url: str, model_server) -> None:  # type: ignore[type-arg]

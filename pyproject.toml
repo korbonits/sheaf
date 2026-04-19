@@ -49,10 +49,30 @@ tts = [
     "transformers>=4.31.0",
     "torch>=2.0.0",
 ]
+kokoro = [
+    "kokoro>=0.9.2",
+    "soundfile>=0.12.1",
+]
 vision = [
     "open-clip-torch>=3.0.0",
     "transformers>=4.37.0",
     "sam2>=1.0",
+]
+pose = [
+    "transformers>=4.46.0",
+    "torch>=2.0.0",
+]
+optical-flow = [
+    "torchvision>=0.15.0",
+    "torch>=2.0.0",
+]
+multimodal-generation = [
+    "diffusers>=0.26.0",
+    "torch>=2.0.0",
+    "Pillow>=9.0.0",
+]
+lidar = [
+    "torch>=2.0.0",
 ]
 molecular = [
     # ESM-3 requires Python 3.12+; marker prevents resolution errors on 3.11

@@ -27,6 +27,10 @@ class ModelType(StrEnum):
     SEGMENTATION = "segmentation"
     DEPTH = "depth"
     DETECTION = "detection"
+    POSE = "pose"
+    OPTICAL_FLOW = "optical_flow"
+    MULTIMODAL_GENERATION = "multimodal_generation"
+    POINT_CLOUD = "point_cloud"
 
 
 class BaseRequest(BaseModel):

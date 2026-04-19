@@ -194,11 +194,11 @@ Serving / infra:
 - [x] `bucket_by` batching — group requests by field value before `@serve.batch`
 
 New model types:
-- [ ] LiDAR / 3D point cloud (PointNet++, OpenShape)
-- [ ] Pose estimation (ViTPose, MediaPipe)
-- [ ] Optical flow (RAFT, UniMatch)
-- [ ] Multimodal generation — text+image-conditioned (SDXL, CogVideoX)
-- [ ] Speech synthesis with fine-grained control (StyleTTS2, Kokoro)
+- [x] LiDAR / 3D point cloud (PointNet — pure-PyTorch, no torch-geometric; embed + ModelNet40 classify; install with `pip install 'sheaf-serve[lidar]'`)
+- [x] Pose estimation (ViTPose — COCO 17-keypoint skeleton, optional person bboxes; install with `pip install 'sheaf-serve[pose]'`)
+- [x] Optical flow (RAFT — raft_large/raft_small via torchvision; (H, W, 2) float32 flow field; install with `pip install 'sheaf-serve[optical-flow]'`)
+- [x] Multimodal generation — text+image-conditioned (SDXL img2img + inpainting; install with `pip install 'sheaf-serve[multimodal-generation]'`)
+- [x] Speech synthesis with fine-grained control (Kokoro — voice + speed per request; install with `pip install 'sheaf-serve[kokoro]'`)
 
 **v0.6 — batch inference + async jobs**
 

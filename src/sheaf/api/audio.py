@@ -103,15 +103,18 @@ class TTSRequest(BaseRequest):
 
     Args:
         text: Input text to synthesize.
-        voice_preset: Optional speaker voice preset (e.g. "v2/en_speaker_6").
-            Bark supports multilingual presets; see the Bark model card for the
-            full list. None uses the model's default voice.
+        voice_preset: Optional speaker voice preset. Bark: "v2/en_speaker_6" etc.
+            Kokoro: "af_heart", "af_bella", "am_adam", "bf_emma", "bm_george", etc.
+            None uses the backend's default voice.
+        speed: Playback speed multiplier [0.5, 2.0]. Supported by Kokoro; ignored
+            by Bark. Default 1.0 (normal speed).
     """
 
     model_type: Literal[ModelType.TTS] = ModelType.TTS
 
     text: str
     voice_preset: str | None = None
+    speed: float = Field(default=1.0, ge=0.5, le=2.0)
 
 
 class TTSResponse(BaseResponse):

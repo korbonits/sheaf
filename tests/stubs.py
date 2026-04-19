@@ -24,6 +24,13 @@ from sheaf.api.multimodal_embedding import (
     MultimodalEmbeddingRequest,
     MultimodalEmbeddingResponse,
 )
+from sheaf.api.multimodal_generation import (
+    MultimodalGenerationRequest,
+    MultimodalGenerationResponse,
+)
+from sheaf.api.optical_flow import OpticalFlowRequest, OpticalFlowResponse
+from sheaf.api.point_cloud import PointCloudRequest, PointCloudResponse
+from sheaf.api.pose import PoseRequest, PoseResponse
 from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
 from sheaf.api.small_molecule import SmallMoleculeRequest, SmallMoleculeResponse
@@ -543,4 +550,152 @@ class SmokeVideoBackend(ModelBackend):
             task="embedding",
             embedding=[0.0] * 768,
             dim=768,
+        )
+
+
+@register_backend("_smoke_kokoro")
+class SmokeKokoroBackend(ModelBackend):
+    """Returns a minimal silent WAV for any Kokoro TTS request."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.TTS
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, TTSRequest)
+        n_samples = 2400
+        from sheaf.backends._audio_utils import encode_wav
+
+        silent = np.zeros(n_samples, dtype=np.float32)
+        wav_bytes = encode_wav(silent, 24000)
+        return TTSResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            audio_b64=base64.b64encode(wav_bytes).decode(),
+            sample_rate=24000,
+        )
+
+
+@register_backend("_smoke_pose")
+class SmokePoseBackend(ModelBackend):
+    """Returns one person with two keypoints for any pose request."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.POSE
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, PoseRequest)
+        return PoseResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            poses=[[[100.0, 200.0, 0.9], [150.0, 180.0, 0.8]]],
+            keypoint_names=["nose", "left_eye"],
+            width=640,
+            height=480,
+        )
+
+
+@register_backend("_smoke_optical_flow")
+class SmokeOpticalFlowBackend(ModelBackend):
+    """Returns a zero flow field at 4×4 resolution."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.OPTICAL_FLOW
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, OpticalFlowRequest)
+        flow = np.zeros((4, 4, 2), dtype=np.float32)
+        return OpticalFlowResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            flow_b64=base64.b64encode(flow.tobytes()).decode(),
+            width=4,
+            height=4,
+        )
+
+
+@register_backend("_smoke_multimodal_gen")
+class SmokeMultimodalGenerationBackend(ModelBackend):
+    """Returns a minimal 8×8 white PNG for any multimodal generation request."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.MULTIMODAL_GENERATION
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        import struct
+        import zlib
+
+        assert isinstance(request, MultimodalGenerationRequest)
+
+        def _png(w: int, h: int) -> bytes:
+            raw = b"\x00" + b"\xff\xff\xff" * w
+            scanlines = raw * h
+            compressed = zlib.compress(scanlines)
+
+            def chunk(tag: bytes, data: bytes) -> bytes:
+                c = tag + data
+                return (
+                    struct.pack(">I", len(data))
+                    + c
+                    + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+                )
+
+            return (
+                b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                + chunk(b"IDAT", compressed)
+                + chunk(b"IEND", b"")
+            )
+
+        png_bytes = _png(8, 8)
+        return MultimodalGenerationResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            image_b64=base64.b64encode(png_bytes).decode(),
+            width=8,
+            height=8,
+            seed=request.seed or 0,
+        )
+
+
+@register_backend("_smoke_point_cloud")
+class SmokePointCloudBackend(ModelBackend):
+    """Returns a 1024-dim zero embedding or dummy classification for any point cloud."""
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.POINT_CLOUD
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        assert isinstance(request, PointCloudRequest)
+        if request.task == "classify":
+            return PointCloudResponse(
+                request_id=request.request_id,
+                model_name=request.model_name,
+                label="airplane",
+                scores=[0.9] + [0.0] * 39,
+                label_names=["airplane"] + [f"class_{i}" for i in range(1, 40)],
+            )
+        return PointCloudResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            embedding=[0.0] * 1024,
         )
