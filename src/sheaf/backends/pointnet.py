@@ -103,9 +103,9 @@ def _build_pointnet(num_classes: int) -> Any:
 
     Imported lazily inside load() so torch is not required at module import time.
     """
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
+    import torch  # ty: ignore[unresolved-import]
+    import torch.nn as nn  # ty: ignore[unresolved-import]
+    import torch.nn.functional as F  # ty: ignore[unresolved-import]
 
     class _PointNetModel(nn.Module):
         def __init__(self, n_cls: int) -> None:
