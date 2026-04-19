@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.4 complete / v0.5 next
+## Current state: v0.5.1 complete / v0.6 next
 
 **What works (v0.2):**
 - Time series: Chronos2, TimesFM, and Moirai backends, full quantile/sample/mean output modes; multivariate support
@@ -39,7 +39,6 @@ PyPI: `pip install sheaf-serve`
 - Weather forecasting: GraphCast backend (`graphcast`, `dm-haiku`, `jax`, `xarray`) — autoregressive n-step rollout from ERA5 surface+atmospheric fields; checkpoint loaded from `.npz`; install with `pip install 'sheaf-serve[weather]'`
 - Earth observation: Prithvi backend (`transformers`, `torch`) — IBM/NASA Prithvi-EO geospatial embeddings via `AutoModel` + `AutoImageProcessor` with `trust_remote_code=True`; `SatelliteRequest` accepts `(n_time, n_bands, H, W)` float32 pixels; per-band z-score normalization; CLS and mean pooling; install with `pip install 'sheaf-serve[earth-observation]'`
 - Cross-modal embeddings: ImageBind backend — five modalities (text, vision, audio, depth, thermal) in a shared 1024-dim embedding space; `MultimodalEmbeddingRequest` accepts exactly one modality field; image/audio inputs written to named temp files (imagebind loaders require file paths); imagebind not on PyPI: `pip install git+https://github.com/facebookresearch/ImageBind.git` then `pip install 'sheaf-serve[multimodal]'`
-- Cross-modal embeddings: ImageBind backend — five modalities (text, vision, audio, depth, thermal) in a shared 1024-dim embedding space; `MultimodalEmbeddingRequest` accepts exactly one modality field; image/audio inputs written to named temp files (imagebind loaders require file paths); imagebind not on PyPI: `pip install git+https://github.com/facebookresearch/ImageBind.git` then `pip install 'sheaf-serve[multimodal]'`
 - Feast feature store: `FeatureRef` Pydantic model in `api/time_series.py`; `FeastResolver` in `integrations/feast.py` wraps `feast.FeatureStore`, resolves online features to `list[float]`; `feast_repo_path` field on `ModelSpec`; resolution happens per-request before batching in both `server.py` and `modal_server.py`; 502 on upstream Feast errors, 422 on missing `feast_repo_path`; smoke test in `test_smoke_feast.py`; example in `examples/quickstart_feast.py`; install with `pip install 'sheaf-serve[feast]'`
 - Modal serverless: `ModalServer` in `modal_server.py` — zero-infra alternative to `ModelServer`; `backend_cls` modules cloudpickled by value via `register_pickle_by_value`; `AnyRequest` defined directly from lightweight API modules (no ray dep); `_build_asgi_app` shared ASGI builder; example in `examples/quickstart_modal.py`; install with `pip install 'sheaf-serve[modal]'`
 - TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` + `predict()` against the live library; 8 tests in `test_tabpfn_integration.py`
@@ -50,11 +49,20 @@ PyPI: `pip install sheaf-serve`
 - Image diffusion: FLUX backend (`diffusers.FluxPipeline`) — FLUX.1-schnell (4 steps, guidance=0, Apache 2.0) and FLUX.1-dev (20-50 steps, guidance=3.5-7.0); `DiffusionRequest` → `DiffusionResponse` with base64-encoded PNG; bfloat16 by default; optional `enable_model_cpu_offload` for low-VRAM GPUs; seed returned in response for reproducibility; 17 mocked tests in `test_flux_backend.py`; install with `pip install 'sheaf-serve[diffusion]'`
 - Video understanding: VideoMAE / TimeSformer backend (`transformers`) — any `AutoModel`-compatible video model; `VideoRequest` accepts base64-encoded frames; embedding task returns CLS or mean-pooled 768-dim (base) / 1024-dim (large) vectors; classification task returns top-5 softmax labels + scores over Kinetics-400; 17 mocked tests in `test_videomae_backend.py`; Ray Serve smoke tests cover both embedding and classification; install with `pip install 'sheaf-serve[video]'`
 
-**What works (v0.5 Ops/DX — in progress):**
+**What works (v0.5 Ops/DX):**
 - Structured JSON logging: `sheaf.logging.JsonFormatter` + `configure_logging()`; gated by `SHEAF_LOG_JSON=1`; request_id / latency_ms / status in every predict log line; 15 tests in `test_logging.py`
 - Prometheus metrics: `sheaf.metrics` module — `sheaf_requests_total`, `sheaf_request_duration_seconds`, `sheaf_batch_size_total`, `sheaf_backend_load_seconds`; `GET /metrics` per deployment; lazy import, `SHEAF_METRICS_DISABLED=1` guard; install with `pip install 'sheaf-serve[metrics]'`
 - OpenTelemetry tracing: `sheaf.tracing` module — `sheaf.predict` span per request with sub-spans for Feast resolution (`sheaf.feast.resolve`) and backend inference (`sheaf.backend.infer`); `configure_tracing()` auto-configures SDK from `OTEL_EXPORTER_OTLP_ENDPOINT` or `SHEAF_OTEL_CONSOLE=1`; lazy import, `SHEAF_TRACING_DISABLED=1` guard, `_NoopTracer`/`_NoopSpan` shims when OTel absent; 24 tests in `test_tracing.py`; install with `pip install 'sheaf-serve[tracing]'`
 - Streaming responses: `POST /{name}/stream` → SSE (`text/event-stream`); `ModelBackend.stream_predict()` async generator (default: single result event); `FluxBackend` overrides with per-step progress events via `threading.Queue` + `callback_on_step_end`; 21 tests in `test_streaming.py`
+- Request caching: `CacheConfig` on `ModelSpec`; in-process LRU, optional TTL, SHA-256 key (excludes `request_id`); `SHEAF_CACHE_DISABLED=1` guard; 27 tests in `test_cache.py`; example in `examples/quickstart_cache.py`
+- `bucket_by` batching: `BatchPolicy.bucket_by` groups requests by scalar field before `@serve.batch`; results reassembled in original order; 18 tests in `test_bucket_by.py`
+
+**What works (v0.5 new model types — shipped in v0.5.1):**
+- Kokoro TTS (`sheaf-serve[kokoro]`): `KokoroBackend` — high-quality TTS via `kokoro.KPipeline`; voice presets + speed control per request; reuses `TTSRequest`/`TTSResponse`; 12 mocked tests in `test_kokoro_backend.py`; example in `examples/quickstart_kokoro.py`
+- Pose estimation (`sheaf-serve[pose]`): `ViTPoseBackend` — COCO 17-keypoint skeleton via `VitPoseForPoseEstimation`; `PoseRequest`/`PoseResponse`; optional person bounding boxes, falls back to full-image crop; `_keypoint_names()` from `model.config.id2label`; 14 mocked tests in `test_vitpose_backend.py`; example in `examples/quickstart_pose.py`
+- Optical flow (`sheaf-serve[optical-flow]`): `RAFTBackend` — dense per-pixel flow via torchvision `raft_large`/`raft_small`; `OpticalFlowRequest`/`OpticalFlowResponse`; flow field shape `(H, W, 2)` float32 base64-encoded; RAFT pads to multiples of 8, output cropped back to original dims; `self._transforms` stored at load() for testability; 13 mocked tests in `test_raft_backend.py`; example in `examples/quickstart_optical_flow.py`
+- Multimodal generation (`sheaf-serve[multimodal-generation]`): `SDXLBackend` — SDXL img2img and inpainting via `StableDiffusionXLImg2ImgPipeline` / `StableDiffusionXLInpaintPipeline`; mode selected at `__init__` time; `MultimodalGenerationRequest`/`MultimodalGenerationResponse`; `torch_dtype` string→dtype resolved inside `load()`; `negative_prompt` omitted from kwargs when empty; 17 mocked tests in `test_sdxl_backend.py`; example in `examples/quickstart_multimodal_generation.py`
+- LiDAR / 3D point cloud (`sheaf-serve[lidar]`): `PointNetBackend` — pure-PyTorch PointNet (no torch-geometric); `_build_pointnet()` embeds the full architecture (shared MLP 3→64→128→1024 via Conv1d + BN, global max pool, classification head 1024→512→256→num_classes); `PointCloudRequest`/`PointCloudResponse`; `task="embed"` returns L2-normalised 1024-dim feature; `task="classify"` returns label + softmax scores over ModelNet40 (default, 40 classes) or custom label set; `self._F` stored at load() for testability; 14 mocked tests in `test_pointnet_backend.py`; example in `examples/quickstart_lidar.py`
 
 ## Repo layout
 
@@ -86,6 +94,10 @@ src/sheaf/
     weather.py         # WeatherRequest/Response (GraphCast)
     diffusion.py       # DiffusionRequest/Response (FLUX)
     video.py           # VideoRequest/Response (VideoMAE / TimeSformer)
+    pose.py            # PoseRequest/Response (ViTPose)
+    optical_flow.py    # OpticalFlowRequest/Response (RAFT)
+    multimodal_generation.py  # MultimodalGenerationRequest/Response (SDXL)
+    point_cloud.py     # PointCloudRequest/Response (PointNet)
   backends/
     base.py            # ModelBackend ABC: load(), predict(), async_predict(), batch_predict()
     chronos.py         # Chronos2Backend — Chronos-Bolt + Chronos-T5 families
@@ -110,6 +122,11 @@ src/sheaf/
     imagebind.py       # ImageBindBackend — cross-modal embeddings (text/vision/audio/depth/thermal); imagebind not on PyPI
     flux.py            # FluxBackend — FLUX.1-schnell / FLUX.1-dev image diffusion via diffusers.FluxPipeline
     videomae.py        # VideoMAEBackend — video embeddings + classification via VideoMAE / TimeSformer
+    kokoro.py          # KokoroBackend — Kokoro TTS via kokoro.KPipeline; voice presets + speed
+    vitpose.py         # ViTPoseBackend — COCO 17-keypoint pose estimation via VitPoseForPoseEstimation
+    raft.py            # RAFTBackend — dense optical flow via torchvision raft_large/raft_small
+    sdxl.py            # SDXLBackend — SDXL img2img + inpainting via diffusers pipelines
+    pointnet.py        # PointNetBackend — pure-PyTorch PointNet 3D point cloud (embed + ModelNet40 classify)
     _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
   scheduling/
     batch.py           # BatchPolicy + bucket_requests() — wired into @serve.batch per deployment
@@ -132,6 +149,11 @@ examples/
   quickstart_video_modal.py  # VideoMAE on Modal (T4): embed + classify synthetic clips
   quickstart_cache.py        # Request caching: CacheConfig on ModelSpec, timing first vs. cached call
   quickstart_streaming.py    # SSE streaming: default (single result) and progressive (progress events) backends
+  quickstart_kokoro.py       # Kokoro TTS: voice presets (af_heart, am_michael), speed control, WAV output
+  quickstart_pose.py         # ViTPose: single-person (full-image) and multi-person (explicit bboxes) keypoints
+  quickstart_optical_flow.py # RAFT: dense flow on synthetic checkerboard frames with known 16px shift
+  quickstart_multimodal_generation.py  # SDXL: img2img and inpainting on synthetic PNG source images
+  quickstart_lidar.py        # PointNet: embed + classify synthetic sphere/cube/cylinder point clouds
   sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
@@ -164,6 +186,11 @@ tests/
   test_metrics.py                      # Prometheus metrics module (no-op absent/disabled + functional, 11+ tests)
   test_tracing.py                      # OTel tracing: NoopSpan/Tracer, configure_tracing, span attributes (24 tests)
   test_streaming.py                    # stream_predict default, FluxBackend SSE events, POST /{name}/stream endpoint (21 tests)
+  test_kokoro_backend.py               # KokoroBackend mocked tests (12 tests)
+  test_vitpose_backend.py              # ViTPoseBackend mocked tests (14 tests)
+  test_raft_backend.py                 # RAFTBackend mocked tests (13 tests)
+  test_sdxl_backend.py                 # SDXLBackend mocked tests (17 tests)
+  test_pointnet_backend.py             # PointNetBackend mocked tests (14 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities + /stream SSE
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
@@ -245,6 +272,11 @@ tests/
 - **FLUX streaming via `threading.Queue`** — `FluxBackend.stream_predict` runs `_run()` in a thread-pool executor via `loop.run_in_executor()`. A `queue.Queue` (thread-safe) bridges the synchronous `callback_on_step_end` (called in the executor thread) to the async generator (running in the event loop thread). Progress events are drained via `q.get_nowait()` / `asyncio.sleep(0.02)` polling while `future.done()` is False, then drained once more after the future completes to avoid race conditions.
 - **`POST /{name}/stream` bypasses batching and cache** — streaming responses are per-request by nature; they cannot be batched (the SSE body is produced incrementally) or meaningfully cached (the stream is ephemeral). The endpoint Feast-resolves identically to `/predict`, then calls `backend.stream_predict()` directly. Errors mid-stream yield a `{"type": "error", "error": "..."}` event instead of crashing the SSE response.
 - **SSE wire format** — each event is a `data: {json}\n\n` line (standard HTML Server-Sent Events spec). Clients parse by stripping the `data: ` prefix and JSON-decoding the rest.
+- **Kokoro reuses TTSRequest/TTSResponse** — `KokoroBackend` shares the same `TTSRequest`/`TTSResponse` contract as `BarkBackend`. Voice preset and speed are per-request fields on `TTSRequest`. `self._pipeline` is assigned in `load()` from `kokoro.KPipeline(lang_code)`, where `lang_code` defaults to `"a"` (American English).
+- **ViTPose top-down + `_keypoint_names()`** — ViTPose is a top-down estimator: it runs on person crops, not the full image. `PoseRequest.bboxes` is `list[list[float]]` (one `[x1,y1,x2,y2]` per person); if empty, the full image is used as a single crop. `AutoProcessor` expects boxes as `[[[x1,y1,x2,y2], ...]]` (one list-of-boxes per image). `_keypoint_names()` reads `model.config.id2label` and returns a list indexed by integer key; falls back to `[]` on `AttributeError`/`KeyError`.
+- **RAFT padding-crop and flow sign** — RAFT requires input dimensions to be multiples of 8. `RAFTBackend._run()` pads both frames to the next multiple-of-8 boundary with `F.pad`, calls RAFT, then crops the output flow field back to `(original_H, original_W)`. Flow sign convention: dx > 0 means pixels moved right (frame2 content is to the right of frame1). A checkerboard shifted 16px rightward in frame2 produces `dx ≈ -16` (content in frame1 moved leftward to reach frame2). `self._transforms` is stored at `load()` time for testability (same pattern as `self._Image`).
+- **SDXL mode at `__init__` time** — `SDXLBackend.__init__` takes `mode: str` ("img2img" or "inpaint"); the corresponding pipeline class (`StableDiffusionXLImg2ImgPipeline` or `StableDiffusionXLInpaintPipeline`) is selected at `load()`. `torch_dtype` is a string at `__init__` and resolved to `torch.dtype` inside `load()` (same pattern as `FluxBackend`). `negative_prompt` is omitted from pipeline kwargs entirely when the request field is empty/None — passing `negative_prompt=""` alters conditioning vs. omitting it.
+- **PointNet `_build_pointnet` module-level function** — the PointNet architecture is defined inside a module-level `_build_pointnet(num_classes)` function (not inside a class), allowing the inner `_PointNetModel` class to close over `num_classes` cleanly. All three torch imports inside `_build_pointnet()` (`torch`, `torch.nn`, `torch.nn.functional`) require `# ty: ignore[unresolved-import]` — CI runs without torch installed, and ty flags unresolved imports inside module-level functions as hard errors (unlike inside methods). `self._F` (torch.nn.functional) is stored at `load()` for testability; `self._model` is the built + loaded network.
 
 ## Adding a new backend
 
