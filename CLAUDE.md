@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.5.1 complete / v0.6 next
+## Current state: v0.6 Track 1 (BatchRunner) in progress / v0.5.1 shipped
 
 **What works (v0.2):**
 - Time series: Chronos2, TimesFM, and Moirai backends, full quantile/sample/mean output modes; multivariate support
@@ -64,6 +64,11 @@ PyPI: `pip install sheaf-serve`
 - Multimodal generation (`sheaf-serve[multimodal-generation]`): `SDXLBackend` — SDXL img2img and inpainting via `StableDiffusionXLImg2ImgPipeline` / `StableDiffusionXLInpaintPipeline`; mode selected at `__init__` time; `MultimodalGenerationRequest`/`MultimodalGenerationResponse`; `torch_dtype` string→dtype resolved inside `load()`; `negative_prompt` omitted from kwargs when empty; 17 mocked tests in `test_sdxl_backend.py`; example in `examples/quickstart_multimodal_generation.py`
 - LiDAR / 3D point cloud (`sheaf-serve[lidar]`): `PointNetBackend` — pure-PyTorch PointNet (no torch-geometric); `_build_pointnet()` embeds the full architecture (shared MLP 3→64→128→1024 via Conv1d + BN, global max pool, classification head 1024→512→256→num_classes); `PointCloudRequest`/`PointCloudResponse`; `task="embed"` returns L2-normalised 1024-dim feature; `task="classify"` returns label + softmax scores over ModelNet40 (default, 40 classes) or custom label set; `self._F` stored at load() for testability; 14 mocked tests in `test_pointnet_backend.py`; example in `examples/quickstart_lidar.py`
 
+**What works (v0.6 Track 1 — offline batch inference):**
+- `BatchRunner` + `BatchSpec` (`sheaf-serve[batch]`): offline batch inference over a JSONL source → JSONL sink via Ray Data `map_batches`; reuses every existing `ModelBackend` unchanged. Stateless task mode with a worker-local `_BACKEND_CACHE` dict keyed by `spec.name` so `load()` fires once per worker process (not once per batch). `BatchSpec` mirrors `ModelSpec` for backend selection (`name`, `model_type`, `backend`, `backend_cls`, `backend_kwargs`) and adds `source` / `sink` / `batch_size` / `num_cpus` / `num_gpus`. `JsonlSource`/`JsonlSink` in v1; new formats slot in as additional `BatchSource`/`BatchSink` subclasses. 9 tests in `test_batch.py`; example in `examples/quickstart_batch.py`. Follow-ups: resumable checkpointing (#12) and actor-pool mode for warm loads on expensive backends (#13).
+- `sheaf.api.union.AnyRequest`: discriminated union extracted from `server.py` into its own module so `batch.runner` can `TypeAdapter(AnyRequest).validate_python(row)` without pulling Ray Serve into the import graph.
+- `sheaf.backends._register`: shared `register_builtin_backends()` + `register_extra_backends()` helpers called on each Ray Data worker before backend lookup. Worker processes don't inherit the driver's import state, and module-level imports may be a stale cloudpickle snapshot, so `_build_backend` imports `_BACKEND_REGISTRY as _registry` fresh after calling the register helpers.
+
 ## Repo layout
 
 ```
@@ -98,6 +103,7 @@ src/sheaf/
     optical_flow.py    # OpticalFlowRequest/Response (RAFT)
     multimodal_generation.py  # MultimodalGenerationRequest/Response (SDXL)
     point_cloud.py     # PointCloudRequest/Response (PointNet)
+    union.py           # AnyRequest — discriminated union across every request type (shared by server + batch)
   backends/
     base.py            # ModelBackend ABC: load(), predict(), async_predict(), batch_predict()
     chronos.py         # Chronos2Backend — Chronos-Bolt + Chronos-T5 families
@@ -135,6 +141,12 @@ src/sheaf/
   integrations/
     __init__.py        # exports FeastResolver
     feast.py           # FeastResolver — wraps feast.FeatureStore, resolves FeatureRef → list[float]
+  batch/
+    __init__.py        # exports BatchRunner, BatchSpec, JsonlSource, JsonlSink
+    spec.py            # BatchSpec + BatchSource/BatchSink base classes; JsonlSource/JsonlSink
+    runner.py          # BatchRunner — Ray Data map_batches over JSONL; stateless tasks + module-level _BACKEND_CACHE
+  backends/
+    _register.py       # register_builtin_backends() + register_extra_backends() — called on each Ray worker
 examples/
   quickstart.py        # Chronos time series example
   quickstart_tabular.py
@@ -154,6 +166,7 @@ examples/
   quickstart_optical_flow.py # RAFT: dense flow on synthetic checkerboard frames with known 16px shift
   quickstart_multimodal_generation.py  # SDXL: img2img and inpainting on synthetic PNG source images
   quickstart_lidar.py        # PointNet: embed + classify synthetic sphere/cube/cylinder point clouds
+  quickstart_batch.py        # BatchRunner: JSONL in → JSONL out via Ray Data map_batches on Chronos-Bolt-tiny
   sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
 tests/
   stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
@@ -191,6 +204,7 @@ tests/
   test_raft_backend.py                 # RAFTBackend mocked tests (13 tests)
   test_sdxl_backend.py                 # SDXLBackend mocked tests (17 tests)
   test_pointnet_backend.py             # PointNetBackend mocked tests (14 tests)
+  test_batch.py                        # BatchRunner + BatchSpec + JSONL I/O + end-to-end Ray Data e2e (9 tests)
   test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities + /stream SSE
   test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
   test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
@@ -277,6 +291,14 @@ tests/
 - **RAFT padding-crop and flow sign** — RAFT requires input dimensions to be multiples of 8. `RAFTBackend._run()` pads both frames to the next multiple-of-8 boundary with `F.pad`, calls RAFT, then crops the output flow field back to `(original_H, original_W)`. Flow sign convention: dx > 0 means pixels moved right (frame2 content is to the right of frame1). A checkerboard shifted 16px rightward in frame2 produces `dx ≈ -16` (content in frame1 moved leftward to reach frame2). `self._transforms` is stored at `load()` time for testability (same pattern as `self._Image`).
 - **SDXL mode at `__init__` time** — `SDXLBackend.__init__` takes `mode: str` ("img2img" or "inpaint"); the corresponding pipeline class (`StableDiffusionXLImg2ImgPipeline` or `StableDiffusionXLInpaintPipeline`) is selected at `load()`. `torch_dtype` is a string at `__init__` and resolved to `torch.dtype` inside `load()` (same pattern as `FluxBackend`). `negative_prompt` is omitted from pipeline kwargs entirely when the request field is empty/None — passing `negative_prompt=""` alters conditioning vs. omitting it.
 - **PointNet `_build_pointnet` module-level function** — the PointNet architecture is defined inside a module-level `_build_pointnet(num_classes)` function (not inside a class), allowing the inner `_PointNetModel` class to close over `num_classes` cleanly. All three torch imports inside `_build_pointnet()` (`torch`, `torch.nn`, `torch.nn.functional`) require `# ty: ignore[unresolved-import]` — CI runs without torch installed, and ty flags unresolved imports inside module-level functions as hard errors (unlike inside methods). `self._F` (torch.nn.functional) is stored at `load()` for testability; `self._model` is the built + loaded network.
+- **BatchRunner — stateless tasks + worker-local module cache** — `BatchRunner` runs `ds.map_batches(_infer, batch_format="pandas", ...)` in stateless task mode. Ray Data reuses worker processes across tasks within a single job, so a module-level `_BACKEND_CACHE: dict[str, ModelBackend]` keyed by `spec.name` means `load()` fires once per worker (not once per batch). Actor-pool mode (warm loads per actor, explicit pool sizing) is deferred to issue #13.
+- **BatchRunner — driver-side pre-validation** — rows are pre-validated against `TypeAdapter(AnyRequest)` and their `model_type` checked against `spec.model_type` on the driver *before* `ray.data.from_items()`. Users see schema errors up-front rather than halfway through a long distributed job. The inner `_infer` also re-validates each pandas row dict before the backend call (belt-and-suspenders, and cheap).
+- **BatchRunner — worker registry refresh** — Ray Data workers don't inherit the driver's import state, and module-level imports may be stale cloudpickle snapshots. `_build_backend` calls `register_builtin_backends()` + `register_extra_backends()` on every worker and re-imports `_BACKEND_REGISTRY as _registry` fresh *after* those calls. Custom / test-only backends registered via `SHEAF_EXTRA_BACKENDS=module1,module2` reach workers this way.
+- **BatchRunner — `uv run` + Ray Data workers** — Ray's `uv_runtime_env_hook.py` parses the `uv run` CLI and packages the working dir as the worker env, but it does *not* forward `--extra` flags transitively. Running `uv run python examples/quickstart_batch.py` without `--extra batch` yields `ModuleNotFoundError: pandas` inside workers. Fix: `uv run --extra batch python ...`, or activate the venv directly (`source .venv/bin/activate`). CI is safe because `uv sync --extra batch` populates the venv before `uv run pytest`.
+- **BatchRunner — `AnyRequest` lives in `sheaf.api.union`** — originally defined in `server.py` alongside Ray Serve imports. Moved into its own module so `batch.runner` can import it without pulling `ray.serve` (the `[batch]` extra depends only on `ray[default]`, pandas, pyarrow — not on `ray[serve]`). `server.py` now just does `from sheaf.api.union import AnyRequest`.
+- **BatchRunner — pandas `batch_format` required** — Sheaf requests are nested dicts (e.g. `history: list[float]`, `bboxes: list[list[float]]`) that don't fit Ray Data's default numpy batch format cleanly. `batch_format="pandas"` converts each batch to a `pd.DataFrame`; `pdf.to_dict(orient="records")` then gives us back the per-row dicts we can validate via `TypeAdapter`.
+- **BatchRunner — ty invalid-argument-type on `map_batches`** — Ray's `UserDefinedFunction` type is too broad for ty to prove the `DataFrame → DataFrame` signature of `_infer`. The `_infer` argument to `ds.map_batches` carries `# ty: ignore[invalid-argument-type]`. Same for the `import pandas` / `import pyarrow` / `import ray.data` lines inside `run()` — they carry `# ty: ignore[unresolved-import]` because CI linters run without the `[batch]` extra installed.
+- **BatchRunner — `ray.data.from_items` preserves order** — Ray Data lineage tracking guarantees `map_batches` + `take_all()` returns rows in input order even when `batch_size` splits the dataset into multiple chunks. Verified by `test_end_to_end_preserves_input_order` with 7 rows and `batch_size=3`.
 
 ## Adding a new backend
 

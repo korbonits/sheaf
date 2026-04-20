@@ -33,6 +33,7 @@ pip install "sheaf-serve[earth-observation]"      # + Prithvi
 pip install "sheaf-serve[weather]"                # + GraphCast
 pip install "sheaf-serve[feast]"                  # + Feast feature store integration
 pip install "sheaf-serve[modal]"                  # + Modal serverless deployment
+pip install "sheaf-serve[batch]"                  # + offline batch inference (Ray Data)
 pip install "sheaf-serve[all]"                    # everything
 ```
 
@@ -205,8 +206,10 @@ New model types:
 The goal: cover every shape of production inference, not just synchronous HTTP.
 
 Offline / batch:
-- [ ] `BatchRunner` — same backend, same typed contract, offline batch mode; Ray Data substrate for distributed execution, checkpointing, and output sinks (S3, Delta Lake, BigQuery)
-- [ ] `BatchSpec` — mirrors `ModelSpec` with source/sink config; reuses all existing backends without modification
+- [x] `BatchRunner` — same backend, same typed contract, offline batch mode; Ray Data `map_batches` substrate, stateless tasks with a worker-local backend cache so `load()` fires once per worker (not once per batch); install with `pip install 'sheaf-serve[batch]'`
+- [x] `BatchSpec` — mirrors `ModelSpec` for backend selection; `JsonlSource`/`JsonlSink` in v1; new sources/sinks (S3, Parquet, Delta) slot in as additional `BatchSource`/`BatchSink` subclasses without changing the runner API
+- [ ] Resumable checkpointing across process restarts ([#12](https://github.com/korbonits/sheaf/issues/12))
+- [ ] Actor-pool execution mode for warm loads on expensive backends (FLUX, GraphCast, SDXL) ([#13](https://github.com/korbonits/sheaf/issues/13))
 
 Async job queue:
 - [ ] `SheafWorker` — queue-consumer pattern for long-running inference (Redis Streams, SQS, Kafka); decouples clients from compute for jobs where HTTP request/response is the wrong shape (FLUX 50-step, GraphCast multi-day rollouts)

@@ -7,12 +7,11 @@ import json
 import logging
 import os
 import time
-from typing import Annotated, Any, cast
+from typing import Any, cast
 
 import ray
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import Field
 from ray import serve
 
 # Auto-import standard backends so they self-register via @register_backend.
@@ -45,28 +44,8 @@ import sheaf.backends.timesfm  # noqa: F401
 import sheaf.backends.videomae  # noqa: F401
 import sheaf.backends.vitpose  # noqa: F401
 import sheaf.backends.whisper  # noqa: F401
-from sheaf.api.audio import AudioRequest, TTSRequest
-from sheaf.api.audio_generation import AudioGenerationRequest
 from sheaf.api.base import BaseRequest
-from sheaf.api.depth import DepthRequest
-from sheaf.api.detection import DetectionRequest
-from sheaf.api.diffusion import DiffusionRequest
-from sheaf.api.embedding import EmbeddingRequest
-from sheaf.api.genomic import GenomicRequest
-from sheaf.api.materials import MaterialsRequest
-from sheaf.api.molecular import MolecularRequest
-from sheaf.api.multimodal_embedding import MultimodalEmbeddingRequest
-from sheaf.api.multimodal_generation import MultimodalGenerationRequest
-from sheaf.api.optical_flow import OpticalFlowRequest
-from sheaf.api.point_cloud import PointCloudRequest
-from sheaf.api.pose import PoseRequest
-from sheaf.api.satellite import SatelliteRequest
-from sheaf.api.segmentation import SegmentationRequest
-from sheaf.api.small_molecule import SmallMoleculeRequest
-from sheaf.api.tabular import TabularRequest
-from sheaf.api.time_series import TimeSeriesRequest
-from sheaf.api.video import VideoRequest
-from sheaf.api.weather import WeatherRequest
+from sheaf.api.union import AnyRequest
 from sheaf.backends.base import ModelBackend
 from sheaf.cache import _DISABLED as _CACHE_DISABLED
 from sheaf.cache import ResponseCache
@@ -87,35 +66,6 @@ from sheaf.tracing import configure_tracing, record_exception, trace_predict, tr
 for _mod in os.environ.get("SHEAF_EXTRA_BACKENDS", "").split(","):
     if _mod.strip():
         importlib.import_module(_mod.strip())
-
-# Discriminated union of all supported request types.
-# FastAPI uses the `model_type` field to select the right Pydantic model
-# and return 422 if the body doesn't match any variant.
-AnyRequest = Annotated[
-    TimeSeriesRequest
-    | TabularRequest
-    | AudioRequest
-    | AudioGenerationRequest
-    | TTSRequest
-    | EmbeddingRequest
-    | SegmentationRequest
-    | MolecularRequest
-    | GenomicRequest
-    | MaterialsRequest
-    | SmallMoleculeRequest
-    | DepthRequest
-    | DetectionRequest
-    | WeatherRequest
-    | SatelliteRequest
-    | MultimodalEmbeddingRequest
-    | DiffusionRequest
-    | VideoRequest
-    | PoseRequest
-    | OpticalFlowRequest
-    | MultimodalGenerationRequest
-    | PointCloudRequest,
-    Field(discriminator="model_type"),
-]
 
 _app = FastAPI(title="Sheaf")
 _logger = logging.getLogger(__name__)

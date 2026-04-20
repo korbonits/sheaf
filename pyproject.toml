@@ -135,6 +135,11 @@ modal = [
 milvus = [
     "pymilvus>=2.4.0",
 ]
+batch = [
+    # Offline batch inference via Ray Data map_batches (pandas batch_format).
+    "pandas>=2.0.0",
+    "pyarrow>=14.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
