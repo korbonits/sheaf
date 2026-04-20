@@ -10,205 +10,72 @@ PyPI: `pip install sheaf-serve`
 
 ## Current state: v0.6 Track 1 (BatchRunner) in progress / v0.5.1 shipped
 
-**What works (v0.2):**
-- Time series: Chronos2, TimesFM, and Moirai backends, full quantile/sample/mean output modes; multivariate support
-- Tabular: TabPFN v2 backend, classification + regression
-- Ray Serve integration end-to-end: `ModelServer.run()` deploys each `ModelSpec` as a Ray Serve deployment
-- HTTP API: `GET /health`, `GET /ready`, `POST /predict` per deployment; 422 on bad input via Pydantic discriminated union
-- Async inference: `ModelBackend.async_predict` / `async_batch_predict` run sync backends in a thread executor
-- Batching: `@serve.batch` with `max_batch_size` and `timeout_ms` wired per deployment from `ModelSpec.batch_policy`
-- Service-boundary error handling: backend exceptions → structured HTTP 500, actor does not crash
-- Model hot-swap without restart: `ModelServer.update(spec)` does a rolling Ray Serve redeploy
-- Custom backends: `SHEAF_EXTRA_BACKENDS=mypackage.backends` imports extra backend modules in Ray workers at startup
-- `backend_cls` field on `ModelSpec`: pass a class directly (cloudpickled) instead of a registry name
-- Container-friendly TabPFN auth: `load()` uses tabpfn's full token resolution order (env var → `~/.cache/tabpfn/auth_token` → `~/.tabpfn/token`); sets `TABPFN_NO_BROWSER=1` automatically; `TabPFNLicenseError` at fit-time is re-raised as `OSError`
+Per-version ship notes live in git history and release tags. This doc tracks what exists *now* and the non-obvious design choices behind it. For feature-level changelog, see `git log`.
 
-**What works (v0.3):**
-- Audio: Whisper backend (`openai-whisper`) and faster-whisper backend (`faster-whisper` / CTranslate2) — transcription, translation, word timestamps, VAD filter, language probability; WAV decoded inline (no ffmpeg needed for WAV inputs); install with `pip install 'sheaf-serve[audio]'`
-- Audio generation: MusicGen backend (`facebook/musicgen-*`) via HuggingFace `transformers.MusicgenForConditionalGeneration` — text-conditioned music/audio generation; `AudioGenerationRequest` → `AudioGenerationResponse`; mono/stereo support; `max_new_tokens = int(duration_s * frame_rate)`; outputs base64-encoded 16-bit PCM WAV at 32kHz; install with `pip install 'sheaf-serve[audio-generation]'`
-- TTS: Bark backend (`suno/bark-small`, `suno/bark`) via HuggingFace `transformers.BarkModel` — text-to-speech with optional voice presets; outputs base64-encoded 16-bit PCM WAV at 24kHz; install with `pip install 'sheaf-serve[tts]'`
-- Vision embeddings: OpenCLIP backend (`open-clip-torch`) — image and text embeddings via CLIP/SigLIP/EVA-CLIP; `EmbeddingRequest` accepts `texts` or `images_b64` (mutually exclusive); L2-normalized by default; install with `pip install 'sheaf-serve[vision]'`
-- Vision embeddings: DINOv2 backend (`transformers`) — image-only CLS or mean-pooled embeddings; install with `pip install 'sheaf-serve[vision]'`
-- Segmentation: SAM2 backend (`sam2`) — prompted image segmentation via point coords, labels, and/or bounding boxes; returns base64-encoded uint8 masks; install with `pip install 'sheaf-serve[vision]'`
-- Depth estimation: Depth Anything v2 backend (`transformers`) — monocular depth estimation; returns base64-encoded float32 depth map + min/max; install with `pip install 'sheaf-serve[vision]'`
-- Object detection: DETR/RT-DETR backend (`transformers`) — any `AutoModelForObjectDetection`-compatible model; returns boxes in `[x1,y1,x2,y2]` pixel coords, class labels, scores; install with `pip install 'sheaf-serve[vision]'`
-- Molecular embeddings: ESM-3 backend (`esm>=3.0.0`) — protein sequence embeddings via EvolutionaryScale ESM-3; CLS or mean pooling; **Python 3.12+ required**; install with `pip install 'sheaf-serve[molecular]'`
-- Genomics embeddings: Nucleotide Transformer backend (`transformers`) — DNA/RNA sequence embeddings via InstaDeepAI/EMBL-EBI Nucleotide Transformer v2; 6-mer tokenization; mean pooling excludes CLS/EOS; install with `pip install 'sheaf-serve[genomics]'`
-- Small molecule embeddings: MolFormer backend (`transformers`, `trust_remote_code=True`) — SMILES embeddings via IBM MolFormer-XL; batched tokenization with attention-masked mean pooling; install with `pip install 'sheaf-serve[small-molecule]'`
-- Materials science: MACE backend (`mace-torch`) — universal interatomic potential via MACE-MP-0; energy, forces, and optional stress via ASE `Atoms` interface; install with `pip install 'sheaf-serve[materials]'`
-- Weather forecasting: GraphCast backend (`graphcast`, `dm-haiku`, `jax`, `xarray`) — autoregressive n-step rollout from ERA5 surface+atmospheric fields; checkpoint loaded from `.npz`; install with `pip install 'sheaf-serve[weather]'`
-- Earth observation: Prithvi backend (`transformers`, `torch`) — IBM/NASA Prithvi-EO geospatial embeddings via `AutoModel` + `AutoImageProcessor` with `trust_remote_code=True`; `SatelliteRequest` accepts `(n_time, n_bands, H, W)` float32 pixels; per-band z-score normalization; CLS and mean pooling; install with `pip install 'sheaf-serve[earth-observation]'`
-- Cross-modal embeddings: ImageBind backend — five modalities (text, vision, audio, depth, thermal) in a shared 1024-dim embedding space; `MultimodalEmbeddingRequest` accepts exactly one modality field; image/audio inputs written to named temp files (imagebind loaders require file paths); imagebind not on PyPI: `pip install git+https://github.com/facebookresearch/ImageBind.git` then `pip install 'sheaf-serve[multimodal]'`
-- Feast feature store: `FeatureRef` Pydantic model in `api/time_series.py`; `FeastResolver` in `integrations/feast.py` wraps `feast.FeatureStore`, resolves online features to `list[float]`; `feast_repo_path` field on `ModelSpec`; resolution happens per-request before batching in both `server.py` and `modal_server.py`; 502 on upstream Feast errors, 422 on missing `feast_repo_path`; smoke test in `test_smoke_feast.py`; example in `examples/quickstart_feast.py`; install with `pip install 'sheaf-serve[feast]'`
-- Modal serverless: `ModalServer` in `modal_server.py` — zero-infra alternative to `ModelServer`; `backend_cls` modules cloudpickled by value via `register_pickle_by_value`; `AnyRequest` defined directly from lightweight API modules (no ray dep); `_build_asgi_app` shared ASGI builder; example in `examples/quickstart_modal.py`; install with `pip install 'sheaf-serve[modal]'`
-- TabPFN integration test (gated on `TABPFN_TOKEN`): real `load()` + `fit()` + `predict()` against the live library; 8 tests in `test_tabpfn_integration.py`
-- Ray Serve smoke coverage: all modalities have end-to-end smoke tests in `test_smoke_ray.py`
-- Feast smoke coverage: real SQLite store, materialise → resolve → predict; 8 tests in `test_smoke_feast.py`; gated on `SHEAF_SMOKE_TEST=1`
+### Core serving
+- **Ray Serve path** — `ModelServer.run()` deploys each `ModelSpec` as a `_SheafDeployment`. Endpoints per deployment: `GET /health`, `GET /ready`, `POST /predict`, `POST /{name}/stream` (SSE), `GET /metrics`. Hot-swap via `ModelServer.update(spec)`.
+- **Modal serverless path** — `ModalServer` in `modal_server.py` is a zero-infra alternative; shared ASGI builder `_build_asgi_app`. No `@serve.batch`, so `bucket_by` is silently ignored.
+- **Offline batch path** — `BatchRunner` + `BatchSpec` in `sheaf.batch` runs any backend over a JSONL source → JSONL sink via Ray Data `map_batches`. Stateless tasks with a worker-local `_BACKEND_CACHE`.
+- **Batching** — `@serve.batch` with per-deployment `max_batch_size` / `timeout_ms`; optional `BatchPolicy.bucket_by` sub-batches by a scalar field before dispatch.
+- **Caching** — opt-in per deployment via `ModelSpec.cache = CacheConfig(...)`; in-process LRU, SHA-256 key, optional TTL. `SHEAF_CACHE_DISABLED=1` disables process-wide.
+- **Feast integration** — `FeatureRef` on `TimeSeriesRequest`; `FeastResolver` wraps `feast.FeatureStore` and resolves online features per-request before batching/cache.
+- **Ops/DX** — structured JSON logging (`SHEAF_LOG_JSON=1`), Prometheus metrics, OTel tracing (`sheaf.predict` → `sheaf.feast.resolve` + `sheaf.backend.infer`), SSE streaming.
+- **Backend plugin model** — `@register_backend("name")` self-registration; or pass a class directly via `ModelSpec.backend_cls` (cloudpickled); or `SHEAF_EXTRA_BACKENDS=module1,module2` for worker-side discovery.
 
-**What works (v0.4):**
-- Image diffusion: FLUX backend (`diffusers.FluxPipeline`) — FLUX.1-schnell (4 steps, guidance=0, Apache 2.0) and FLUX.1-dev (20-50 steps, guidance=3.5-7.0); `DiffusionRequest` → `DiffusionResponse` with base64-encoded PNG; bfloat16 by default; optional `enable_model_cpu_offload` for low-VRAM GPUs; seed returned in response for reproducibility; 17 mocked tests in `test_flux_backend.py`; install with `pip install 'sheaf-serve[diffusion]'`
-- Video understanding: VideoMAE / TimeSformer backend (`transformers`) — any `AutoModel`-compatible video model; `VideoRequest` accepts base64-encoded frames; embedding task returns CLS or mean-pooled 768-dim (base) / 1024-dim (large) vectors; classification task returns top-5 softmax labels + scores over Kinetics-400; 17 mocked tests in `test_videomae_backend.py`; Ray Serve smoke tests cover both embedding and classification; install with `pip install 'sheaf-serve[video]'`
+### Supported model types
 
-**What works (v0.5 Ops/DX):**
-- Structured JSON logging: `sheaf.logging.JsonFormatter` + `configure_logging()`; gated by `SHEAF_LOG_JSON=1`; request_id / latency_ms / status in every predict log line; 15 tests in `test_logging.py`
-- Prometheus metrics: `sheaf.metrics` module — `sheaf_requests_total`, `sheaf_request_duration_seconds`, `sheaf_batch_size_total`, `sheaf_backend_load_seconds`; `GET /metrics` per deployment; lazy import, `SHEAF_METRICS_DISABLED=1` guard; install with `pip install 'sheaf-serve[metrics]'`
-- OpenTelemetry tracing: `sheaf.tracing` module — `sheaf.predict` span per request with sub-spans for Feast resolution (`sheaf.feast.resolve`) and backend inference (`sheaf.backend.infer`); `configure_tracing()` auto-configures SDK from `OTEL_EXPORTER_OTLP_ENDPOINT` or `SHEAF_OTEL_CONSOLE=1`; lazy import, `SHEAF_TRACING_DISABLED=1` guard, `_NoopTracer`/`_NoopSpan` shims when OTel absent; 24 tests in `test_tracing.py`; install with `pip install 'sheaf-serve[tracing]'`
-- Streaming responses: `POST /{name}/stream` → SSE (`text/event-stream`); `ModelBackend.stream_predict()` async generator (default: single result event); `FluxBackend` overrides with per-step progress events via `threading.Queue` + `callback_on_step_end`; 21 tests in `test_streaming.py`
-- Request caching: `CacheConfig` on `ModelSpec`; in-process LRU, optional TTL, SHA-256 key (excludes `request_id`); `SHEAF_CACHE_DISABLED=1` guard; 27 tests in `test_cache.py`; example in `examples/quickstart_cache.py`
-- `bucket_by` batching: `BatchPolicy.bucket_by` groups requests by scalar field before `@serve.batch`; results reassembled in original order; 18 tests in `test_bucket_by.py`
+| Model type | Backend(s) | API module | Extras flag |
+|---|---|---|---|
+| Time series | Chronos2, TimesFM, Moirai | `api/time_series.py` | (core) |
+| Tabular | TabPFN v2 | `api/tabular.py` | (core) |
+| Audio (ASR) | Whisper, faster-whisper | `api/audio.py` | `[audio]` |
+| Audio generation | MusicGen | `api/audio_generation.py` | `[audio-generation]` |
+| TTS | Bark, Kokoro | `api/audio.py` (TTSRequest) | `[tts]`, `[kokoro]` |
+| Vision embedding | OpenCLIP, DINOv2 | `api/embedding.py` | `[vision]` |
+| Segmentation | SAM2 | `api/segmentation.py` | `[vision]` |
+| Depth | Depth Anything v2 | `api/depth.py` | `[vision]` |
+| Object detection | DETR/RT-DETR | `api/detection.py` | `[vision]` |
+| Pose | ViTPose | `api/pose.py` | `[pose]` |
+| Optical flow | RAFT | `api/optical_flow.py` | `[optical-flow]` |
+| Video | VideoMAE / TimeSformer | `api/video.py` | `[video]` |
+| Image diffusion | FLUX (schnell/dev) | `api/diffusion.py` | `[diffusion]` |
+| Multimodal generation | SDXL img2img/inpaint | `api/multimodal_generation.py` | `[multimodal-generation]` |
+| Cross-modal embedding | ImageBind | `api/multimodal_embedding.py` | `[multimodal]` (+ git install) |
+| Molecular (protein) | ESM-3 (Py 3.12+) | `api/molecular.py` | `[molecular]` |
+| Genomics | Nucleotide Transformer | `api/genomic.py` | `[genomics]` |
+| Small molecule | MolFormer | `api/small_molecule.py` | `[small-molecule]` |
+| Materials | MACE-MP-0 | `api/materials.py` | `[materials]` |
+| Weather | GraphCast | `api/weather.py` | `[weather]` |
+| Earth observation | Prithvi-EO | `api/satellite.py` | `[earth-observation]` |
+| LiDAR / 3D | PointNet (pure PyTorch) | `api/point_cloud.py` | `[lidar]` |
 
-**What works (v0.5 new model types — shipped in v0.5.1):**
-- Kokoro TTS (`sheaf-serve[kokoro]`): `KokoroBackend` — high-quality TTS via `kokoro.KPipeline`; voice presets + speed control per request; reuses `TTSRequest`/`TTSResponse`; 12 mocked tests in `test_kokoro_backend.py`; example in `examples/quickstart_kokoro.py`
-- Pose estimation (`sheaf-serve[pose]`): `ViTPoseBackend` — COCO 17-keypoint skeleton via `VitPoseForPoseEstimation`; `PoseRequest`/`PoseResponse`; optional person bounding boxes, falls back to full-image crop; `_keypoint_names()` from `model.config.id2label`; 14 mocked tests in `test_vitpose_backend.py`; example in `examples/quickstart_pose.py`
-- Optical flow (`sheaf-serve[optical-flow]`): `RAFTBackend` — dense per-pixel flow via torchvision `raft_large`/`raft_small`; `OpticalFlowRequest`/`OpticalFlowResponse`; flow field shape `(H, W, 2)` float32 base64-encoded; RAFT pads to multiples of 8, output cropped back to original dims; `self._transforms` stored at load() for testability; 13 mocked tests in `test_raft_backend.py`; example in `examples/quickstart_optical_flow.py`
-- Multimodal generation (`sheaf-serve[multimodal-generation]`): `SDXLBackend` — SDXL img2img and inpainting via `StableDiffusionXLImg2ImgPipeline` / `StableDiffusionXLInpaintPipeline`; mode selected at `__init__` time; `MultimodalGenerationRequest`/`MultimodalGenerationResponse`; `torch_dtype` string→dtype resolved inside `load()`; `negative_prompt` omitted from kwargs when empty; 17 mocked tests in `test_sdxl_backend.py`; example in `examples/quickstart_multimodal_generation.py`
-- LiDAR / 3D point cloud (`sheaf-serve[lidar]`): `PointNetBackend` — pure-PyTorch PointNet (no torch-geometric); `_build_pointnet()` embeds the full architecture (shared MLP 3→64→128→1024 via Conv1d + BN, global max pool, classification head 1024→512→256→num_classes); `PointCloudRequest`/`PointCloudResponse`; `task="embed"` returns L2-normalised 1024-dim feature; `task="classify"` returns label + softmax scores over ModelNet40 (default, 40 classes) or custom label set; `self._F` stored at load() for testability; 14 mocked tests in `test_pointnet_backend.py`; example in `examples/quickstart_lidar.py`
-
-**What works (v0.6 Track 1 — offline batch inference):**
-- `BatchRunner` + `BatchSpec` (`sheaf-serve[batch]`): offline batch inference over a JSONL source → JSONL sink via Ray Data `map_batches`; reuses every existing `ModelBackend` unchanged. Stateless task mode with a worker-local `_BACKEND_CACHE` dict keyed by `spec.name` so `load()` fires once per worker process (not once per batch). `BatchSpec` mirrors `ModelSpec` for backend selection (`name`, `model_type`, `backend`, `backend_cls`, `backend_kwargs`) and adds `source` / `sink` / `batch_size` / `num_cpus` / `num_gpus`. `JsonlSource`/`JsonlSink` in v1; new formats slot in as additional `BatchSource`/`BatchSink` subclasses. 9 tests in `test_batch.py`; example in `examples/quickstart_batch.py`. Follow-ups: resumable checkpointing (#12) and actor-pool mode for warm loads on expensive backends (#13).
-- `sheaf.api.union.AnyRequest`: discriminated union extracted from `server.py` into its own module so `batch.runner` can `TypeAdapter(AnyRequest).validate_python(row)` without pulling Ray Serve into the import graph.
-- `sheaf.backends._register`: shared `register_builtin_backends()` + `register_extra_backends()` helpers called on each Ray Data worker before backend lookup. Worker processes don't inherit the driver's import state, and module-level imports may be a stale cloudpickle snapshot, so `_build_backend` imports `_BACKEND_REGISTRY as _registry` fresh after calling the register helpers.
+Other extras: `[feast]`, `[modal]`, `[metrics]`, `[tracing]`, `[batch]`.
 
 ## Repo layout
 
 ```
 src/sheaf/
   __init__.py          # public exports: ModelServer, ModelSpec
-  spec.py              # ModelSpec, ResourceConfig — declares what to serve
-  server.py            # ModelServer + _SheafDeployment — Ray Serve orchestrator
-  registry.py          # @register_backend decorator + _BACKEND_REGISTRY dict
-  logging.py           # JsonFormatter + configure_logging — structured JSON logging (SHEAF_LOG_JSON=1)
-  metrics.py           # Prometheus metrics: record_predict/batch/load, register_metrics_endpoint, time_load
-  tracing.py           # OTel tracing: configure_tracing, get_tracer, trace_predict, trace_span, record_exception
-  api/
-    base.py            # BaseRequest, BaseResponse, ModelType enum
-    time_series.py     # TimeSeriesRequest/Response, Frequency, OutputMode
-    tabular.py         # TabularRequest/Response
-    audio.py           # AudioRequest/Response, TTSRequest/TTSResponse
-    audio_generation.py # AudioGenerationRequest/Response (MusicGen)
-    embedding.py       # EmbeddingRequest/Response
-    multimodal_embedding.py  # MultimodalEmbeddingRequest/Response (ImageBind)
-    segmentation.py    # SegmentationRequest/Response
-    depth.py           # DepthRequest/Response
-    detection.py       # DetectionRequest/Response
-    molecular.py       # MolecularRequest/Response (ESM-3)
-    genomic.py         # GenomicRequest/Response (Nucleotide Transformer)
-    small_molecule.py  # SmallMoleculeRequest/Response (MolFormer)
-    materials.py       # MaterialsRequest/Response (MACE)
-    satellite.py       # SatelliteRequest/Response (Prithvi)
-    weather.py         # WeatherRequest/Response (GraphCast)
-    diffusion.py       # DiffusionRequest/Response (FLUX)
-    video.py           # VideoRequest/Response (VideoMAE / TimeSformer)
-    pose.py            # PoseRequest/Response (ViTPose)
-    optical_flow.py    # OpticalFlowRequest/Response (RAFT)
-    multimodal_generation.py  # MultimodalGenerationRequest/Response (SDXL)
-    point_cloud.py     # PointCloudRequest/Response (PointNet)
-    union.py           # AnyRequest — discriminated union across every request type (shared by server + batch)
-  backends/
-    base.py            # ModelBackend ABC: load(), predict(), async_predict(), batch_predict()
-    chronos.py         # Chronos2Backend — Chronos-Bolt + Chronos-T5 families
-    moirai.py          # MoiraiBackend — Salesforce Moirai (uni2ts)
-    tabpfn.py          # TabPFNBackend — TabPFN v2 classification + regression
-    timesfm.py         # TimesFMBackend
-    whisper.py         # WhisperBackend — openai-whisper (PyTorch)
-    faster_whisper.py  # FasterWhisperBackend — faster-whisper (CTranslate2, no torch at runtime)
-    bark.py            # BarkBackend — Bark TTS via HuggingFace transformers
-    musicgen.py        # MusicGenBackend — MusicGen audio generation via HuggingFace transformers
-    open_clip.py       # OpenCLIPBackend — image/text embeddings via open-clip-torch
-    dinov2.py          # DINOv2Backend — image-only embeddings via HuggingFace transformers (CLS or mean pooling)
-    sam2.py            # SAM2Backend — prompted image segmentation via sam2 library
-    depth_anything.py  # DepthAnythingBackend — monocular depth estimation via transformers
-    detr.py            # DETRBackend — object detection via DETR/RT-DETR (AutoModelForObjectDetection)
-    esm3.py            # ESM3Backend — protein sequence embeddings via EvolutionaryScale esm (Python 3.12+)
-    nucleotide_transformer.py  # NucleotideTransformerBackend — DNA/RNA embeddings via transformers
-    molformer.py       # MolFormerBackend — SMILES embeddings via IBM MolFormer-XL (trust_remote_code=True)
-    mace.py            # MACEBackend — MACE-MP-0 universal interatomic potential via ASE
-    graphcast.py       # GraphCastBackend — weather forecasting via google-deepmind/graphcast (JAX/Haiku)
-    prithvi.py         # PrithviBackend — IBM/NASA Prithvi-EO geospatial embeddings (trust_remote_code=True)
-    imagebind.py       # ImageBindBackend — cross-modal embeddings (text/vision/audio/depth/thermal); imagebind not on PyPI
-    flux.py            # FluxBackend — FLUX.1-schnell / FLUX.1-dev image diffusion via diffusers.FluxPipeline
-    videomae.py        # VideoMAEBackend — video embeddings + classification via VideoMAE / TimeSformer
-    kokoro.py          # KokoroBackend — Kokoro TTS via kokoro.KPipeline; voice presets + speed
-    vitpose.py         # ViTPoseBackend — COCO 17-keypoint pose estimation via VitPoseForPoseEstimation
-    raft.py            # RAFTBackend — dense optical flow via torchvision raft_large/raft_small
-    sdxl.py            # SDXLBackend — SDXL img2img + inpainting via diffusers pipelines
-    pointnet.py        # PointNetBackend — pure-PyTorch PointNet 3D point cloud (embed + ModelNet40 classify)
-    _audio_utils.py    # Shared WAV encoding/decoding utility (no ffmpeg for WAV inputs)
-  scheduling/
-    batch.py           # BatchPolicy + bucket_requests() — wired into @serve.batch per deployment
-  cache/
-    __init__.py        # CacheConfig + ResponseCache — in-process LRU with optional TTL (SHEAF_CACHE_DISABLED=1)
-  integrations/
-    __init__.py        # exports FeastResolver
-    feast.py           # FeastResolver — wraps feast.FeatureStore, resolves FeatureRef → list[float]
-  batch/
-    __init__.py        # exports BatchRunner, BatchSpec, JsonlSource, JsonlSink
-    spec.py            # BatchSpec + BatchSource/BatchSink base classes; JsonlSource/JsonlSink
-    runner.py          # BatchRunner — Ray Data map_batches over JSONL; stateless tasks + module-level _BACKEND_CACHE
-  backends/
-    _register.py       # register_builtin_backends() + register_extra_backends() — called on each Ray worker
-examples/
-  quickstart.py        # Chronos time series example
-  quickstart_tabular.py
-  time_series_comparison.py  # Chronos vs TimesFM
-  quickstart_audio.py        # Whisper + faster-whisper transcription, word timestamps, translation
-  quickstart_vision.py       # DINOv2 + OpenCLIP image embeddings, CLS vs mean pooling, cross-modal retrieval
-  quickstart_feast.py        # Feast feature store: build repo → materialise → feature_ref requests → Chronos forecasts
-  quickstart_modal.py        # Modal serverless deployment with Chronos
-  quickstart_diffusion.py    # FLUX.1-schnell: text-to-image generation, seed reproducibility, batch
-  quickstart_diffusion_modal.py  # FLUX on Modal (T4): local-source workaround, tiny-flux-pipe for CI
-  quickstart_video.py        # VideoMAE embeddings (CLS + mean pooling) + action classification
-  quickstart_video_modal.py  # VideoMAE on Modal (T4): embed + classify synthetic clips
-  quickstart_cache.py        # Request caching: CacheConfig on ModelSpec, timing first vs. cached call
-  quickstart_streaming.py    # SSE streaming: default (single result) and progressive (progress events) backends
-  quickstart_kokoro.py       # Kokoro TTS: voice presets (af_heart, am_michael), speed control, WAV output
-  quickstart_pose.py         # ViTPose: single-person (full-image) and multi-person (explicit bboxes) keypoints
-  quickstart_optical_flow.py # RAFT: dense flow on synthetic checkerboard frames with known 16px shift
-  quickstart_multimodal_generation.py  # SDXL: img2img and inpainting on synthetic PNG source images
-  quickstart_lidar.py        # PointNet: embed + classify synthetic sphere/cube/cylinder point clouds
-  quickstart_batch.py        # BatchRunner: JSONL in → JSONL out via Ray Data map_batches on Chronos-Bolt-tiny
-  sample.wav                 # 4.8s 16kHz mono WAV for audio examples / smoke tests
-tests/
-  stubs.py             # Pytest-free stub backends for Ray worker cloudpickle
-  test_api.py
-  test_tabular_api.py
-  test_server.py       # ModelBackend async dispatch, AnyRequest union, registry
-  test_feast_resolver.py               # FeastResolver unit tests + _build_asgi_app Feast integration (12 tests)
-  test_modal_server.py                 # ModalServer / _build_asgi_app tests (via TestClient)
-  test_whisper_backend.py              # WhisperBackend mocked tests (8 tests)
-  test_faster_whisper_backend.py       # FasterWhisperBackend mocked tests (9 tests)
-  test_bark_backend.py                 # BarkBackend mocked tests (9 tests)
-  test_musicgen_backend.py             # MusicGenBackend mocked tests (14 tests)
-  test_open_clip_backend.py            # OpenCLIPBackend mocked tests (12 tests)
-  test_dinov2_backend.py               # DINOv2Backend mocked tests (10 tests)
-  test_sam2_backend.py                 # SAM2Backend mocked tests (11 tests)
-  test_depth_anything_backend.py       # DepthAnythingBackend mocked tests (10 tests)
-  test_detr_backend.py                 # DETRBackend mocked tests (11 tests)
-  test_esm3_backend.py                 # ESM3Backend mocked tests (10 tests)
-  test_nucleotide_transformer_backend.py  # NucleotideTransformerBackend mocked tests (13 tests)
-  test_molformer_backend.py            # MolFormerBackend mocked tests (14 tests)
-  test_mace_backend.py                 # MACEBackend mocked tests (13 tests)
-  test_graphcast_backend.py            # GraphCastBackend mocked tests (16 tests)
-  test_prithvi_backend.py              # PrithviBackend mocked tests (14 tests)
-  test_imagebind_backend.py            # ImageBindBackend mocked tests (20 tests)
-  test_flux_backend.py                 # FluxBackend mocked tests (17 tests)
-  test_videomae_backend.py             # VideoMAEBackend mocked tests (17 tests)
-  test_bucket_by.py                    # BatchPolicy, bucket_requests (grouping/ordering), and dispatch integration (18 tests)
-  test_cache.py                        # CacheConfig, ResponseCache (LRU/TTL/key), and _build_asgi_app integration (27 tests)
-  test_logging.py                      # JsonFormatter + configure_logging + server integration (15 tests)
-  test_metrics.py                      # Prometheus metrics module (no-op absent/disabled + functional, 11+ tests)
-  test_tracing.py                      # OTel tracing: NoopSpan/Tracer, configure_tracing, span attributes (24 tests)
-  test_streaming.py                    # stream_predict default, FluxBackend SSE events, POST /{name}/stream endpoint (21 tests)
-  test_kokoro_backend.py               # KokoroBackend mocked tests (12 tests)
-  test_vitpose_backend.py              # ViTPoseBackend mocked tests (14 tests)
-  test_raft_backend.py                 # RAFTBackend mocked tests (13 tests)
-  test_sdxl_backend.py                 # SDXLBackend mocked tests (17 tests)
-  test_pointnet_backend.py             # PointNetBackend mocked tests (14 tests)
-  test_batch.py                        # BatchRunner + BatchSpec + JSONL I/O + end-to-end Ray Data e2e (9 tests)
-  test_smoke_ray.py    # End-to-end Ray Serve tests (SHEAF_SMOKE_TEST=1 to run); covers all modalities + /stream SSE
-  test_tabpfn_integration.py           # TabPFN integration tests — gated on TABPFN_TOKEN (8 tests)
-  test_smoke_whisper.py                # Whisper + faster-whisper e2e (SHEAF_SMOKE_TEST=1 to run)
-  test_smoke_feast.py                  # Feast end-to-end: SQLite store, materialise, resolve, predict (SHEAF_SMOKE_TEST=1)
+  spec.py              # ModelSpec, ResourceConfig
+  server.py            # ModelServer + _SheafDeployment (Ray Serve orchestrator)
+  modal_server.py      # ModalServer (Modal serverless alternative)
+  registry.py          # @register_backend + _BACKEND_REGISTRY
+  logging.py           # JsonFormatter + configure_logging (SHEAF_LOG_JSON=1)
+  metrics.py           # Prometheus: record_predict/batch/load, register_metrics_endpoint
+  tracing.py           # OTel: configure_tracing, trace_predict, trace_span, record_exception
+  api/                 # one module per model type; see table above. union.py = AnyRequest
+  backends/            # one module per backend (name matches the table above)
+    base.py            # ModelBackend ABC: load/predict/async_predict/batch_predict/stream_predict
+    _register.py       # register_builtin_backends() + register_extra_backends() for workers
+    _audio_utils.py    # WAV encode/decode (no ffmpeg for WAV inputs)
+  scheduling/batch.py  # BatchPolicy + bucket_requests()
+  cache/               # CacheConfig + ResponseCache (LRU + optional TTL)
+  integrations/feast.py  # FeastResolver (wraps feast.FeatureStore)
+  batch/               # BatchRunner, BatchSpec, JsonlSource, JsonlSink
+examples/              # quickstart_*.py per model type + sample.wav
+tests/                 # test_<backend>_backend.py (mocked) + test_smoke_*.py (gated on SHEAF_SMOKE_TEST=1)
+                       # test_tabpfn_integration.py gated on TABPFN_TOKEN
+                       # stubs.py: pytest-free stub backends for Ray worker cloudpickle
 ```
 
 ## Architecture
@@ -237,6 +104,7 @@ tests/
 - **`history` vs `feature_ref`** — `TimeSeriesRequest` accepts either raw float history or a Feast feature reference (mutually exclusive, validated by `@model_validator`).
 - **Bolt vs Chronos2 inference** — `Chronos2Backend` handles both `ChronosBoltPipeline` (returns fixed 9 quantiles) and `Chronos2Pipeline` (returns samples). The distinction is detected at `load()` time via `isinstance` check.
 - **TabPFN per-request fit** — TabPFN is an in-context learner. `batch_predict` runs each request independently (different context tables per request). Future: batch query rows against same context table.
+- **Container-friendly TabPFN auth** — `load()` uses tabpfn's full token resolution order (env var → `~/.cache/tabpfn/auth_token` → `~/.tabpfn/token`); sets `TABPFN_NO_BROWSER=1` automatically; `TabPFNLicenseError` at fit-time is re-raised as `OSError`.
 - **faster-whisper lazy generator** — `WhisperModel.transcribe()` returns `(segments_generator, info)`. The generator must be fully consumed before `info` fields (language, duration) are reliable. `FasterWhisperBackend._run()` consumes it immediately in a list comprehension. Do not partially iterate.
 - **WAV without ffmpeg** — `_audio_utils.decode_audio()` parses RIFF/WAV directly to float32 numpy at 16kHz for 16/32-bit PCM. Non-WAV formats fall back to a named temp file (calling backend passes the path; the model invokes ffmpeg internally).
 - **WAV encoding** — `_audio_utils.encode_wav()` encodes a float32 numpy array to 16-bit PCM WAV bytes (pure numpy/struct, no scipy). Used by `BarkBackend` and `MusicGenBackend` to produce the `audio_b64` response field.
