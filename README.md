@@ -1,9 +1,11 @@
 # Sheaf
 
 [![PyPI](https://img.shields.io/pypi/v/sheaf-serve)](https://pypi.org/project/sheaf-serve/)
+[![Downloads](https://img.shields.io/pypi/dm/sheaf-serve)](https://pypi.org/project/sheaf-serve/)
 [![CI](https://github.com/korbonits/sheaf/actions/workflows/ci.yml/badge.svg)](https://github.com/korbonits/sheaf/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/pypi/pyversions/sheaf-serve)](https://pypi.org/project/sheaf-serve/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 **Unified serving layer for non-text foundation models.**
 
