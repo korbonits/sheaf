@@ -28,4 +28,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --extra dev --extra batch
-      - run: uv run pytest tests/ -v
+      # --extra batch on `uv run` so Ray's uv_runtime_env_hook forwards it
+      # into Ray Data worker envs (otherwise workers miss pandas/pyarrow).
+      - run: uv run --extra dev --extra batch pytest tests/ -v
