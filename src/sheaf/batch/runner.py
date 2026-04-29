@@ -1,14 +1,20 @@
 """BatchRunner — offline batch inference via Ray Data map_batches.
 
-Reuses every existing ``ModelBackend`` unchanged.  Execution is Ray Data
-``map_batches`` in stateless task mode: the backend is instantiated and
-loaded inside the worker process and cached at module level so ``load()``
-fires once per worker rather than once per batch.
+Reuses every existing ``ModelBackend`` unchanged.  Two execution modes:
 
-Deferred follow-ups:
+* ``compute="tasks"`` (default): stateless Ray Data tasks with a
+  module-level worker-local backend cache, so ``load()`` fires once per
+  worker process rather than once per batch.  Best for cheap loads and
+  small jobs.
+
+* ``compute="actors"``: an actor pool sized by ``num_actors``.  Each
+  actor calls ``load()`` once at ``__init__`` and the loaded backend
+  persists for the actor's lifetime.  Best for backends with expensive
+  ``load()`` (FLUX, GraphCast, SDXL) where the cold-start cost would
+  otherwise dominate.
+
+Deferred follow-up:
   * Resumable checkpointing across process restarts — #12
-  * Actor-pool execution mode for warm loads on models with expensive
-    ``load()`` (FLUX, GraphCast, SDXL) — #13
 """
 
 from __future__ import annotations
@@ -152,20 +158,47 @@ class BatchRunner:
 
         captured_spec = spec
 
-        def _infer(pdf: pd.DataFrame) -> pd.DataFrame:
-            backend = _get_or_load_backend(captured_spec)
-            request_dicts = pdf.to_dict(orient="records")
-            requests = [_REQUEST_ADAPTER.validate_python(r) for r in request_dicts]
-            responses = backend.batch_predict(requests)
-            return pd.DataFrame([r.model_dump(mode="json") for r in responses])
+        if spec.compute == "actors":
+            # Actor pool — one load() per actor at __init__, persists for the
+            # actor's lifetime.  Ray Data terminates actors when the dataset
+            # is fully consumed (take_all() below).
 
-        result_ds = ds.map_batches(
-            _infer,  # ty: ignore[invalid-argument-type]
-            batch_format="pandas",
-            batch_size=spec.batch_size,
-            num_cpus=spec.num_cpus,
-            num_gpus=spec.num_gpus,
-        )
+            class _BackendActor:
+                def __init__(self) -> None:
+                    self._backend = _build_backend(captured_spec)
+
+                def __call__(self, pdf: pd.DataFrame) -> pd.DataFrame:
+                    request_dicts = pdf.to_dict(orient="records")
+                    requests = [
+                        _REQUEST_ADAPTER.validate_python(r) for r in request_dicts
+                    ]
+                    responses = self._backend.batch_predict(requests)
+                    return pd.DataFrame([r.model_dump(mode="json") for r in responses])
+
+            result_ds = ds.map_batches(
+                _BackendActor,  # ty: ignore[invalid-argument-type]
+                batch_format="pandas",
+                batch_size=spec.batch_size,
+                concurrency=spec.num_actors,
+                num_cpus=spec.num_cpus,
+                num_gpus=spec.num_gpus,
+            )
+        else:
+
+            def _infer(pdf: pd.DataFrame) -> pd.DataFrame:
+                backend = _get_or_load_backend(captured_spec)
+                request_dicts = pdf.to_dict(orient="records")
+                requests = [_REQUEST_ADAPTER.validate_python(r) for r in request_dicts]
+                responses = backend.batch_predict(requests)
+                return pd.DataFrame([r.model_dump(mode="json") for r in responses])
+
+            result_ds = ds.map_batches(
+                _infer,  # ty: ignore[invalid-argument-type]
+                batch_format="pandas",
+                batch_size=spec.batch_size,
+                num_cpus=spec.num_cpus,
+                num_gpus=spec.num_gpus,
+            )
 
         # Ray Data preserves row order across map operations; take_all()
         # returns rows in input order.

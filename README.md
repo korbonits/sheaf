@@ -211,7 +211,7 @@ Offline / batch:
 - [x] `BatchRunner` — same backend, same typed contract, offline batch mode; Ray Data `map_batches` substrate, stateless tasks with a worker-local backend cache so `load()` fires once per worker (not once per batch); install with `pip install 'sheaf-serve[batch]'`
 - [x] `BatchSpec` — mirrors `ModelSpec` for backend selection; `JsonlSource`/`JsonlSink` in v1; new sources/sinks (S3, Parquet, Delta) slot in as additional `BatchSource`/`BatchSink` subclasses without changing the runner API
 - [ ] Resumable checkpointing across process restarts ([#12](https://github.com/korbonits/sheaf/issues/12))
-- [ ] Actor-pool execution mode for warm loads on expensive backends (FLUX, GraphCast, SDXL) ([#13](https://github.com/korbonits/sheaf/issues/13))
+- [x] Actor-pool execution mode for warm loads on expensive backends (FLUX, GraphCast, SDXL) — opt-in via `BatchSpec.compute="actors"` + `num_actors=N`; `load()` runs once per actor at `__init__` and persists for the actor's lifetime ([#13](https://github.com/korbonits/sheaf/issues/13))
 
 Async job queue:
 - [ ] `SheafWorker` — queue-consumer pattern for long-running inference (Redis Streams, SQS, Kafka); decouples clients from compute for jobs where HTTP request/response is the wrong shape (FLUX 50-step, GraphCast multi-day rollouts)

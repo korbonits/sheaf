@@ -111,6 +111,45 @@ def test_batch_spec_rejects_nonpositive_batch_size(tmp_path):
         )
 
 
+def test_batch_spec_actors_requires_num_actors(tmp_path):
+    with pytest.raises(ValueError, match="num_actors is required"):
+        BatchSpec(
+            name="t",
+            model_type=ModelType.TIME_SERIES,
+            backend="_smoke_ts",
+            source=JsonlSource(path=str(tmp_path / "in.jsonl")),
+            sink=JsonlSink(path=str(tmp_path / "out.jsonl")),
+            compute="actors",
+        )
+
+
+def test_batch_spec_actors_with_num_actors(tmp_path):
+    spec = BatchSpec(
+        name="t",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_ts",
+        source=JsonlSource(path=str(tmp_path / "in.jsonl")),
+        sink=JsonlSink(path=str(tmp_path / "out.jsonl")),
+        compute="actors",
+        num_actors=2,
+    )
+    assert spec.compute == "actors"
+    assert spec.num_actors == 2
+
+
+def test_batch_spec_rejects_nonpositive_num_actors(tmp_path):
+    with pytest.raises(ValueError):
+        BatchSpec(
+            name="t",
+            model_type=ModelType.TIME_SERIES,
+            backend="_smoke_ts",
+            source=JsonlSource(path=str(tmp_path / "in.jsonl")),
+            sink=JsonlSink(path=str(tmp_path / "out.jsonl")),
+            compute="actors",
+            num_actors=0,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Driver validation — must happen before Ray dispatch
 # ---------------------------------------------------------------------------
@@ -199,6 +238,91 @@ def test_end_to_end_time_series(tmp_path, ts_rows):
     for row_in, row_out in zip(ts_rows, output):
         assert row_out["horizon"] == row_in["horizon"]
         assert row_out["mean"] == [0.42] * row_in["horizon"]
+
+
+def test_end_to_end_actor_pool(tmp_path, ts_rows):
+    """End-to-end with compute='actors' — load() runs once per actor."""
+    src = tmp_path / "in.jsonl"
+    sink = tmp_path / "out.jsonl"
+    src.write_text("\n".join(json.dumps(r) for r in ts_rows))
+
+    spec = BatchSpec(
+        name="e2e-ts-actors",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_ts",
+        source=JsonlSource(path=str(src)),
+        sink=JsonlSink(path=str(sink)),
+        batch_size=2,
+        compute="actors",
+        num_actors=1,
+    )
+    n = BatchRunner(spec).run()
+
+    assert n == len(ts_rows)
+    output = _read_jsonl(str(sink))
+    assert len(output) == len(ts_rows)
+    for row_in, row_out in zip(ts_rows, output):
+        assert row_out["horizon"] == row_in["horizon"]
+        assert row_out["mean"] == [0.42] * row_in["horizon"]
+
+
+def test_end_to_end_actor_pool_multi_actor_preserves_order(tmp_path):
+    """Multi-actor dispatch must preserve input row order — Ray Data lineage."""
+    rows = [
+        {
+            "model_type": "time_series",
+            "model_name": f"req-{i:03d}",
+            "history": [float(i)] * 5,
+            "horizon": 2,
+            "frequency": "1h",
+        }
+        for i in range(25)
+    ]
+    src = tmp_path / "ordered_actors.jsonl"
+    sink = tmp_path / "ordered_actors_out.jsonl"
+    src.write_text("\n".join(json.dumps(r) for r in rows))
+
+    spec = BatchSpec(
+        name="order-actors",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_ts",
+        source=JsonlSource(path=str(src)),
+        sink=JsonlSink(path=str(sink)),
+        batch_size=4,
+        compute="actors",
+        num_actors=3,
+    )
+    BatchRunner(spec).run()
+
+    output = _read_jsonl(str(sink))
+    assert [r["model_name"] for r in output] == [r["model_name"] for r in rows]
+
+
+def test_end_to_end_actor_pool_propagates_backend_errors(tmp_path):
+    """Exceptions raised inside _BackendActor.__call__ must reach the driver."""
+    rows = [
+        {
+            "model_type": "time_series",
+            "model_name": "boom",
+            "history": [1.0, 2.0, 3.0],
+            "horizon": 2,
+            "frequency": "1h",
+        }
+    ]
+    src = tmp_path / "err.jsonl"
+    src.write_text("\n".join(json.dumps(r) for r in rows))
+
+    spec = BatchSpec(
+        name="err-actors",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_error",
+        source=JsonlSource(path=str(src)),
+        sink=JsonlSink(path=str(tmp_path / "err_out.jsonl")),
+        compute="actors",
+        num_actors=1,
+    )
+    with pytest.raises(Exception, match="backend exploded"):
+        BatchRunner(spec).run()
 
 
 def test_end_to_end_preserves_input_order(tmp_path):

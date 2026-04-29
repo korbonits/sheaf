@@ -14,9 +14,10 @@ Key points:
     surface up-front (not halfway through a long distributed run).
   - Output row order matches input row order — Ray Data preserves lineage
     across ``map_batches``.
-  - Two follow-up tracks are deferred to issues:
-      * Resumable checkpointing across process restarts — #12
-      * Actor-pool mode for warm loads on expensive ``load()`` — #13
+  - For backends with expensive ``load()`` (FLUX, GraphCast, SDXL), see
+    ``quickstart_batch_actors.py`` — sets ``compute="actors"`` so the
+    model loads once per actor and stays warm across batches.
+  - Resumable checkpointing across process restarts is deferred to #12.
 
 Usage::
 

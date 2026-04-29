@@ -11,9 +11,9 @@ tracked in follow-up issues and will slot in as additional
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from sheaf.api.base import ModelType
 
@@ -88,10 +88,49 @@ class BatchSpec(BaseModel):
     num_cpus: float = Field(
         default=1.0,
         ge=0,
-        description="CPUs reserved per Ray Data task.",
+        description=(
+            "CPUs reserved per execution unit (per Ray Data task in "
+            "compute='tasks' mode, per actor in compute='actors' mode)."
+        ),
     )
     num_gpus: float = Field(
         default=0.0,
         ge=0,
-        description="GPUs reserved per Ray Data task.",
+        description=(
+            "GPUs reserved per execution unit (per Ray Data task in "
+            "compute='tasks' mode, per actor in compute='actors' mode)."
+        ),
     )
+    compute: Literal["tasks", "actors"] = Field(
+        default="tasks",
+        description=(
+            "Execution mode.  'tasks' (default) runs each batch as a "
+            "stateless Ray Data task with a worker-local backend cache, "
+            "so load() fires once per worker process.  'actors' uses an "
+            "actor pool sized by num_actors; load() fires once per actor "
+            "at __init__ and persists for the actor's lifetime, "
+            "eliminating cold-start cost on subsequent batches.  Use "
+            "actors for backends with expensive load() (FLUX, GraphCast, "
+            "SDXL); use tasks for cheap loads or small jobs."
+        ),
+    )
+    num_actors: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Actor pool size when compute='actors'.  Required in actor "
+            "mode, ignored in task mode.  Each actor reserves num_cpus + "
+            "num_gpus for its lifetime; sizing must satisfy "
+            "num_actors * num_gpus <= cluster GPUs."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _validate_compute_config(self) -> BatchSpec:
+        if self.compute == "actors" and self.num_actors is None:
+            raise ValueError(
+                "num_actors is required when compute='actors'.  Set "
+                "num_actors=N to size the pool (e.g. num_actors=2 with "
+                "num_gpus=1 reserves 2 GPUs)."
+            )
+        return self
