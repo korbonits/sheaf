@@ -40,6 +40,33 @@ _BACKEND_CACHE: dict[str, ModelBackend] = {}
 
 _REQUEST_ADAPTER: TypeAdapter[Any] = TypeAdapter(AnyRequest)
 
+# Sentinel column the runner injects to track row order across the
+# distributed pipeline — Ray Data's streaming executor does not preserve
+# input order on its own.  Stripped from outputs before they are written.
+_IDX_FIELD = "_sheaf_row_idx"
+
+
+def _run_batch(backend: ModelBackend, pdf: Any) -> Any:
+    """Run a backend over a pandas DataFrame batch, preserving _IDX_FIELD.
+
+    Pulls the row-index sentinel out of the input DataFrame, validates the
+    rest of each row against ``AnyRequest``, runs ``batch_predict``, then
+    re-attaches the indices to the output rows so the driver can sort
+    back into input order after ``take_all()``.
+    """
+    import pandas as pd  # noqa: PLC0415  # ty: ignore[unresolved-import]
+
+    request_dicts = pdf.to_dict(orient="records")
+    indices = [r.pop(_IDX_FIELD) for r in request_dicts]
+    requests = [_REQUEST_ADAPTER.validate_python(r) for r in request_dicts]
+    responses = backend.batch_predict(requests)
+    out_records = []
+    for idx, resp in zip(indices, responses):
+        rec = resp.model_dump(mode="json")
+        rec[_IDX_FIELD] = idx
+        out_records.append(rec)
+    return pd.DataFrame(out_records)
+
 
 def _build_backend(spec: BatchSpec) -> ModelBackend:
     # Worker processes don't inherit the driver's import state, so populate
@@ -154,7 +181,13 @@ class BatchRunner:
         if not ray.is_initialized():
             ray.init()
 
-        ds = ray.data.from_items(rows)
+        # Tag each row with a 0-based index so the runner can re-sort
+        # outputs back to input order after distributed processing.  Ray
+        # Data's streaming executor (default in Ray 2.x) does not
+        # preserve order across `map_batches` blocks — this is the
+        # production-safe answer.
+        indexed_rows = [{**row, _IDX_FIELD: i} for i, row in enumerate(rows)]
+        ds = ray.data.from_items(indexed_rows)
 
         captured_spec = spec
 
@@ -168,12 +201,7 @@ class BatchRunner:
                     self._backend = _build_backend(captured_spec)
 
                 def __call__(self, pdf: pd.DataFrame) -> pd.DataFrame:
-                    request_dicts = pdf.to_dict(orient="records")
-                    requests = [
-                        _REQUEST_ADAPTER.validate_python(r) for r in request_dicts
-                    ]
-                    responses = self._backend.batch_predict(requests)
-                    return pd.DataFrame([r.model_dump(mode="json") for r in responses])
+                    return _run_batch(self._backend, pdf)
 
             result_ds = ds.map_batches(
                 _BackendActor,  # ty: ignore[invalid-argument-type]
@@ -187,10 +215,7 @@ class BatchRunner:
 
             def _infer(pdf: pd.DataFrame) -> pd.DataFrame:
                 backend = _get_or_load_backend(captured_spec)
-                request_dicts = pdf.to_dict(orient="records")
-                requests = [_REQUEST_ADAPTER.validate_python(r) for r in request_dicts]
-                responses = backend.batch_predict(requests)
-                return pd.DataFrame([r.model_dump(mode="json") for r in responses])
+                return _run_batch(backend, pdf)
 
             result_ds = ds.map_batches(
                 _infer,  # ty: ignore[invalid-argument-type]
@@ -200,9 +225,12 @@ class BatchRunner:
                 num_gpus=spec.num_gpus,
             )
 
-        # Ray Data preserves row order across map operations; take_all()
-        # returns rows in input order.
-        output_rows = result_ds.take_all()
+        # Sort by the row-index sentinel and strip it before writing —
+        # outputs are guaranteed to land in input order regardless of
+        # how Ray Data scheduled the underlying tasks/actors.
+        output_rows = sorted(result_ds.take_all(), key=lambda r: r[_IDX_FIELD])
+        for r in output_rows:
+            r.pop(_IDX_FIELD, None)
         _write_jsonl(spec.sink.path, output_rows)
         _logger.info(
             "BatchRunner %s: wrote %d rows to %s",
