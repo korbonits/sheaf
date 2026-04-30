@@ -250,6 +250,15 @@ wheels = [
 ]
 
 [[package]]
+name = "async-timeout"
+version = "5.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a5/ae/136395dfbfe00dfc94da3f3e136d0b13f394cba8f4841120e34226265780/async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3", size = 9274, upload-time = "2024-11-06T16:41:39.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/ba/e2081de779ca30d473f21f5b30e0e737c438205440784c7dfc81efc2b029/async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c", size = 6233, upload-time = "2024-11-06T16:41:37.9Z" },
+]
+
+[[package]]
 name = "attrs"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5521,6 +5530,18 @@ wheels = [
 ]
 
 [[package]]
+name = "redis"
+version = "7.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "async-timeout", marker = "python_full_version < '3.11.3' or (extra == 'extra-11-sheaf-serve-all' and extra == 'extra-11-sheaf-serve-moirai') or (extra == 'extra-11-sheaf-serve-moirai' and extra == 'extra-11-sheaf-serve-vision')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7b/7f/3759b1d0d72b7c92f0d70ffd9dc962b7b7b5ee74e135f9d7d8ab06b8a318/redis-7.4.0.tar.gz", hash = "sha256:64a6ea7bf567ad43c964d2c30d82853f8df927c5c9017766c55a1d1ed95d18ad", size = 4943913, upload-time = "2026-03-24T09:14:37.53Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/74/3a/95deec7db1eb53979973ebd156f3369a72732208d1391cd2e5d127062a32/redis-7.4.0-py3-none-any.whl", hash = "sha256:a9c74a5c893a5ef8455a5adb793a31bb70feb821c86eccb62eebef5a19c429ec", size = 409772, upload-time = "2026-03-24T09:14:35.968Z" },
+]
+
+[[package]]
 name = "referencing"
 version = "0.37.0"
 source = { registry = "https://pypi.org/simple" }
@@ -6062,7 +6083,7 @@ wheels = [
 
 [[package]]
 name = "sheaf-serve"
-version = "0.6.1"
+version = "0.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
@@ -6227,6 +6248,10 @@ weather = [
     { name = "jax" },
     { name = "xarray" },
 ]
+worker = [
+    { name = "httpx" },
+    { name = "redis" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -6246,6 +6271,7 @@ requires-dist = [
     { name = "feast", marker = "extra == 'feast'", specifier = ">=0.40.0" },
     { name = "graphcast", marker = "extra == 'weather'", specifier = ">=0.1.0,<1.0.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "httpx", marker = "extra == 'worker'", specifier = ">=0.27.0" },
     { name = "jax", marker = "extra == 'weather'", specifier = ">=0.4.25" },
     { name = "kokoro", marker = "extra == 'kokoro'", specifier = ">=0.9.2" },
     { name = "mace-torch", marker = "extra == 'materials'", specifier = ">=0.3.0" },
@@ -6267,6 +6293,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "ray", extras = ["serve"], specifier = ">=2.10.0" },
+    { name = "redis", marker = "extra == 'worker'", specifier = ">=5.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
     { name = "sam2", marker = "extra == 'vision'", specifier = ">=1.0" },
     { name = "sheaf-serve", extras = ["time-series", "tabular", "audio", "audio-generation", "tts", "vision", "genomics", "small-molecule", "materials", "earth-observation", "feast", "milvus"], marker = "extra == 'all'" },
@@ -6301,7 +6328,7 @@ requires-dist = [
     { name = "uni2ts", marker = "extra == 'moirai'", specifier = ">=2.0.0" },
     { name = "xarray", marker = "extra == 'weather'", specifier = ">=2024.1.0" },
 ]
-provides-extras = ["time-series", "tabular", "moirai", "audio", "audio-generation", "tts", "kokoro", "vision", "pose", "optical-flow", "multimodal-generation", "lidar", "molecular", "weather", "earth-observation", "genomics", "materials", "small-molecule", "multimodal", "diffusion", "video", "feast", "metrics", "tracing", "modal", "milvus", "batch", "dev", "all"]
+provides-extras = ["time-series", "tabular", "moirai", "audio", "audio-generation", "tts", "kokoro", "vision", "pose", "optical-flow", "multimodal-generation", "lidar", "molecular", "weather", "earth-observation", "genomics", "materials", "small-molecule", "multimodal", "diffusion", "video", "feast", "metrics", "tracing", "modal", "milvus", "batch", "worker", "dev", "all"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "modal", specifier = ">=1.4.1" }]

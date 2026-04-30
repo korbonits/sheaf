@@ -214,8 +214,8 @@ Offline / batch:
 - [x] Actor-pool execution mode for warm loads on expensive backends (FLUX, GraphCast, SDXL) — opt-in via `BatchSpec.compute="actors"` + `num_actors=N`; `load()` runs once per actor at `__init__` and persists for the actor's lifetime ([#13](https://github.com/korbonits/sheaf/issues/13))
 
 Async job queue:
-- [ ] `SheafWorker` — queue-consumer pattern for long-running inference (Redis Streams, SQS, Kafka); decouples clients from compute for jobs where HTTP request/response is the wrong shape (FLUX 50-step, GraphCast multi-day rollouts)
-- [ ] Job lifecycle: enqueue → processing → result / dead-letter; webhook on completion
+- [x] `SheafWorker` — queue-consumer pattern for long-running inference; v1 ships Redis Streams + consumer groups (horizontal scaling), pluggable `JobQueue` / `ResultStore` ABCs for SQS / Kafka follow-ups; install with `pip install 'sheaf-serve[worker]'`
+- [x] Job lifecycle: enqueue → processing → result / dead-letter; per-job webhook on completion (best-effort POST)
 - [ ] Priority lanes + per-tenant fair queuing
 
 **v0.7 — adapter multiplexing + client SDK**

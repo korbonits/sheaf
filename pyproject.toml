@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sheaf-serve"
-version = "0.6.1"
+version = "0.7.0"
 description = "Unified serving layer for non-text foundation models"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -139,6 +139,11 @@ batch = [
     # Offline batch inference via Ray Data map_batches (pandas batch_format).
     "pandas>=2.0.0",
     "pyarrow>=14.0.0",
+]
+worker = [
+    # Async-job worker — Redis Streams queue + hash result store.
+    "redis>=5.0.0",
+    "httpx>=0.27.0",
 ]
 dev = [
     "pytest>=8.0.0",

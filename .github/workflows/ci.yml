@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --extra dev --extra batch
+      - run: uv sync --extra dev --extra batch --extra worker
       - run: uv run ruff check src/ tests/
       - run: uv run ruff format --check src/ tests/
       - run: uv run ty check src/
@@ -27,7 +27,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv sync --extra dev --extra batch
+      - run: uv sync --extra dev --extra batch --extra worker
       # --extra batch on `uv run` so Ray's uv_runtime_env_hook forwards it
       # into Ray Data worker envs (otherwise workers miss pandas/pyarrow).
-      - run: uv run --extra dev --extra batch pytest tests/ -v
+      - run: uv run --extra dev --extra batch --extra worker pytest tests/ -v
