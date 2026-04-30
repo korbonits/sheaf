@@ -78,7 +78,7 @@ class Chronos2Backend(ModelBackend):
         self._pipeline = BaseChronosPipeline.from_pretrained(
             self._model_id,
             device_map=self._device_map,
-            dtype=torch_dtype,
+            torch_dtype=torch_dtype,
         )
         self._is_bolt = isinstance(self._pipeline, ChronosBoltPipeline)
 
