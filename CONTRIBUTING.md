@@ -7,10 +7,12 @@ Thanks for your interest. Sheaf is early — the best contributions right now ar
 ```bash
 git clone https://github.com/korbonits/sheaf.git
 cd sheaf
-uv sync --extra dev
-uv run pre-commit install   # wire up pre-commit hooks (required, per-clone)
+uv sync --extra dev --extra batch --extra worker   # mirrors CI; required for full test pass
+uv run pre-commit install                          # wire up pre-commit hooks (required, per-clone)
 uv run pytest tests/
 ```
+
+The `--extra batch` and `--extra worker` flags pull in `pandas`/`pyarrow` (Ray Data) and `fakeredis` respectively — without them, `tests/test_batch.py` skips and `tests/test_smoke_worker.py` is a no-op.  CI runs with the same combination.
 
 ## What to contribute
 
@@ -23,12 +25,7 @@ Each new model type needs:
 
 The time series contract (`src/sheaf/api/time_series.py`) and Chronos2 backend (`src/sheaf/backends/chronos.py`) are the reference implementation. Follow that pattern.
 
-**Wanted backends (v0.5 targets, in priority order):**
-- LiDAR / 3D point cloud (PointNet++, OpenShape)
-- Pose estimation (ViTPose, MediaPipe)
-- Optical flow (RAFT, UniMatch)
-- Multimodal generation — text+image-conditioned (SDXL, CogVideoX)
-- Speech synthesis with fine-grained control (StyleTTS2, Kokoro)
+**What's wanted now**: the original v0.5 wishlist (LiDAR, pose, optical flow, multimodal generation, controllable TTS) all shipped in v0.5.1.  Open an issue if you have a model type in mind that isn't in the table below — the contract design is the interesting part, not the integration plumbing.
 
 ### API contract feedback
 
@@ -75,7 +72,7 @@ class MyModelBackend(ModelBackend):
 
 Then add your model's optional dependencies to `pyproject.toml` under `[project.optional-dependencies]`.
 
-## Implemented backends (v0.4 — complete)
+## Implemented backends
 
 All backends below are implemented, tested, and wired into the Ray Serve smoke suite:
 
@@ -89,11 +86,14 @@ All backends below are implemented, tested, and wired into the Ray Serve smoke s
 | FasterWhisper | `faster_whisper` | `audio` | CTranslate2; no torch at inference |
 | MusicGen | `musicgen` | `audio-generation` | Meta MusicGen; text → audio |
 | Bark | `bark` | `tts` | Suno Bark via transformers |
+| Kokoro | `kokoro` | `kokoro` | Voice + speed per request; reuses `TTSRequest` |
 | OpenCLIP | `open_clip` | `vision` | Image and text embeddings |
 | DINOv2 | `dinov2` | `vision` | Image embeddings; CLS or mean pooling |
 | SAM2 | `sam2` | `vision` | Prompted segmentation |
 | DepthAnything | `depth_anything` | `vision` | Monocular depth estimation |
 | DETR | `detr` | `vision` | Object detection; any `AutoModelForObjectDetection` |
+| ViTPose | `vitpose` | `pose` | Top-down COCO 17-keypoint estimation |
+| RAFT | `raft` | `optical-flow` | torchvision raft_large/raft_small |
 | ESM-3 | `esm3` | `molecular` | Protein embeddings; Python 3.12+ |
 | NucleotideTransformer | `nucleotide_transformer` | `genomics` | DNA/RNA embeddings |
 | MolFormer | `molformer` | `small-molecule` | Small molecule SMILES embeddings |
@@ -102,7 +102,9 @@ All backends below are implemented, tested, and wired into the Ray Serve smoke s
 | GraphCast | `graphcast` | `weather` | Google DeepMind weather forecasting |
 | ImageBind | `imagebind` | `multimodal` | Cross-modal embeddings; install from source (not on PyPI) |
 | FLUX | `flux` | `diffusion` | FLUX.1-schnell / FLUX.1-dev image generation |
+| SDXL | `sdxl` | `multimodal-generation` | img2img + inpainting; mode set at `__init__` |
 | VideoMAE | `videomae` | `video` | VideoMAE / TimeSformer embeddings + Kinetics-400 classification |
+| PointNet | `pointnet` | `lidar` | Pure-PyTorch 3D point cloud embed + ModelNet40 classify |
 
 ## Feast feature store integration
 
@@ -150,6 +152,57 @@ app = server.app  # modal deploy my_server.py
 ```
 
 See `examples/quickstart_modal.py` for a full example.
+
+## Offline batch inference
+
+`BatchRunner` runs any registered backend over a JSONL source → JSONL sink via Ray Data `map_batches`.  Same backend, same typed contract — the request/response classes are shared with the Ray Serve and Modal paths.
+
+```python
+from sheaf.batch import BatchRunner, BatchSpec, JsonlSource, JsonlSink
+
+spec = BatchSpec(
+    name="chronos-batch",
+    model_type=ModelType.TIME_SERIES,
+    backend="chronos2",
+    backend_kwargs={"model_id": "amazon/chronos-bolt-tiny", "device_map": "cpu"},
+    source=JsonlSource(path="in.jsonl"),
+    sink=JsonlSink(path="out.jsonl"),
+    batch_size=64,
+)
+BatchRunner(spec).run()
+```
+
+Two execution modes:
+
+- **`compute="tasks"`** (default): stateless tasks with a worker-local backend cache.  `load()` fires once per worker process.  Best for cheap loads.
+- **`compute="actors"`**: actor pool of size `num_actors`; `load()` fires once per actor and the loaded model persists for the actor's lifetime.  Best for FLUX / GraphCast / SDXL.
+
+See `examples/quickstart_batch.py` and `examples/quickstart_batch_actors.py`.  Install with `pip install 'sheaf-serve[batch]'`.
+
+## Async-job worker
+
+`SheafWorker` consumes jobs from a queue (Redis Streams in v1; pluggable `JobQueue` / `ResultStore` ABCs for SQS / Kafka / Postgres later).  For inference where HTTP request/response is the wrong shape — FLUX 50-step, GraphCast multi-day rollouts, large-batch SDXL.
+
+```python
+from sheaf.api.base import ModelType
+from sheaf.worker import (
+    SheafWorker, WorkerSpec, RedisStreamsQueue, RedisHashResultStore,
+)
+
+spec = WorkerSpec(
+    name="flux-worker",
+    model_type=ModelType.DIFFUSION,
+    backend="flux",
+    queue=RedisStreamsQueue(stream="sheaf:flux", group="workers", consumer="w1"),
+    results=RedisHashResultStore(prefix="sheaf:flux:result"),
+    max_retries=3,
+)
+SheafWorker(spec).start()
+```
+
+Clients enqueue via `JobQueueClient.enqueue(request, webhook_url=None)` and either poll `wait_for_result(job_id)` or wait for a webhook POST on completion.  At-least-once delivery (XACK only after persist); jobs that exceed `max_retries` go to a dead-letter stream and a `status="failed"` `JobResult` is written so polling clients don't hang.
+
+See `examples/quickstart_worker.py`.  Install with `pip install 'sheaf-serve[worker]'`.
 
 ## Code style
 
