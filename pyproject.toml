@@ -154,6 +154,10 @@ dev = [
     "mypy>=1.9.0",
     "ty>=0.0.0",
     "pre-commit>=3.7.0",
+    # In-memory Redis for SheafWorker integration smoke (test_smoke_worker.py).
+    # Avoids needing a Redis service container in CI while still exercising
+    # the real RedisStreamsQueue / RedisHashResultStore code paths.
+    "fakeredis>=2.20.0",
 ]
 all = [
     # Excludes extras with narrow Python constraints or cross-extra conflicts:
