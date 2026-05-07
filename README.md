@@ -118,6 +118,28 @@ server = ModalServer(models=[spec], app_name="my-sheaf", gpu="A10G")
 app = server.app  # modal deploy my_server.py
 ```
 
+**Typed Python client:**
+
+```python
+from sheaf.client import SheafClient
+from sheaf.api.time_series import Frequency, TimeSeriesRequest
+
+with SheafClient(base_url="http://localhost:8000") as client:
+    resp = client.predict(
+        "chronos",
+        TimeSeriesRequest(
+            model_name="chronos",
+            history=[1.0, 2.0, 3.0, 4.0, 5.0],
+            horizon=3,
+            frequency=Frequency.HOURLY,
+        ),
+    )
+# resp is a typed TimeSeriesResponse — same Pydantic class the server returned
+print(resp.mean)
+```
+
+`AsyncSheafClient` is the async-mirror; `client.stream(deployment, request)` yields SSE events for streaming backends like FLUX.
+
 See [`examples/`](examples/) for time series comparison, tabular, audio, vision, and the Feast feature store quickstart.
 
 ---
@@ -232,12 +254,15 @@ New model types:
 - [x] Bucket-by-resolved-adapter inside Ray Serve batch windows: `set_active_adapters` is called exactly once per homogeneous sub-batch
 - [ ] Hot-add adapters at runtime without `ModelServer.update(spec)` (deferred — adds VRAM-eviction / index-sync surface area)
 
-**Future**
+**v0.9 — typed Python client (Track 1 complete)**
 
-Client SDK:
-- [ ] `pip install sheaf-client` — typed Python client generated from request/response schemas
-- [ ] Async client (`httpx`-backed); retry + timeout; streams SSE natively
-- [ ] Language-agnostic: publish OpenAPI spec so teams can generate clients in any language
+Ships as `sheaf.client` inside `sheaf-serve` (not a separate `sheaf-client` PyPI package — schemas stay in one tree, no codegen, no drift).  Splittable into its own package later if external client contributors arrive or install footprint becomes a real cost.
+
+- [x] `SheafClient` (sync) + `AsyncSheafClient` (async, `httpx`-backed); typed `predict(deployment, request) -> response` against the discriminated `AnyResponse` union
+- [x] `health()` / `ready()` helpers; structured exceptions (`ValidationError` for 422, `ServerError` for 500, `ClientError` for transport failures)
+- [x] SSE streaming via `client.stream(deployment, request)` async generator
+- [ ] Retry config; surface server-side `request_id` to the client for log correlation
+- [ ] Language-agnostic: publish OpenAPI spec from FastAPI so teams can `openapi-python-client` etc. for non-Python languages
 
 ---
 

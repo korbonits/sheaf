@@ -204,6 +204,34 @@ Clients enqueue via `JobQueueClient.enqueue(request, webhook_url=None)` and eith
 
 See `examples/quickstart_worker.py`.  Install with `pip install 'sheaf-serve[worker]'`.
 
+## Typed Python client (`sheaf.client`)
+
+`sheaf.client.SheafClient` and `AsyncSheafClient` are HTTP wrappers around the same `/<deployment>/predict`, `/health`, `/ready`, `/stream` endpoints that `ModelServer` (Ray Serve) and `ModalServer` expose.  They decode responses through the `AnyResponse` discriminated union in `sheaf.api.union`, so callers get the correctly-typed Pydantic class back instead of a raw dict.
+
+```python
+from sheaf.client import SheafClient
+from sheaf.api.time_series import Frequency, TimeSeriesRequest
+
+with SheafClient(base_url="http://localhost:8000") as client:
+    resp = client.predict(
+        "chronos",
+        TimeSeriesRequest(
+            model_name="chronos",
+            history=[1.0, 2.0, 3.0],
+            horizon=3,
+            frequency=Frequency.HOURLY,
+        ),
+    )
+    # resp is a TimeSeriesResponse
+```
+
+The client is in core deps (`httpx`), so `pip install sheaf-serve` includes it — no separate package, no codegen, no schema drift.  When you add a new request/response pair under `src/sheaf/api/`, register both classes in `src/sheaf/api/union.py` (`AnyRequest` and `AnyResponse`) so both the server's discriminator and the client's typed decoding pick them up automatically.
+
+Tests:
+- `tests/test_client.py` covers each client method against `httpx.MockTransport` (no app).
+- `tests/test_client_integration.py` drives the real `_build_asgi_app` ASGI app via `httpx.ASGITransport` — closes the gap between unit tests and the `SHEAF_SMOKE_TEST=1` Ray Serve smoke.
+- `tests/test_client_stream.py` covers the SSE event parsing path.
+
 ## LoRA adapter multiplexing
 
 Diffusion backends (`flux`, `sdxl`) opt in to LoRA via `supports_lora()` returning `True`.  Declare the adapter registry on the spec, and select per request:
