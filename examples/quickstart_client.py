@@ -18,7 +18,9 @@ What this shows:
   - Sync ``SheafClient.predict`` returning a typed ``TimeSeriesResponse``
   - Async ``AsyncSheafClient.predict``
   - ``client.health(...)`` / ``client.ready(...)`` for orchestration
-  - Error mapping: 422 → ``ValidationError``, 500 → ``ServerError``
+  - Error mapping: 422 → ``ValidationError``, 500 → ``ServerError``;
+    every error carries ``e.request_id`` for log correlation
+  - ``RetryConfig`` with exponential backoff for transient 5xx + connection errors
   - SSE streaming via ``client.stream(...)`` (works against any deployment
     whose backend implements ``stream_predict`` — FLUX is the canonical case)
 """
@@ -31,6 +33,8 @@ from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import Frequency, TimeSeriesRequest
 from sheaf.client import (
     AsyncSheafClient,
+    RetryConfig,
+    ServerError,
     SheafClient,
     SheafError,
     ValidationError,
@@ -130,11 +134,49 @@ def error_examples() -> None:
                 ),
             )
         except SheafError as e:
-            print(f"SheafError ({e.status_code}): {e.detail[:120]}")
+            # Every error carries the request_id of the request that triggered
+            # it — useful for log correlation when re-raising at a service
+            # boundary without holding onto the original request object.
+            print(
+                f"SheafError ({e.status_code}): {e.detail[:80]}  "
+                f"request_id={e.request_id}"
+            )
 
 
 # ---------------------------------------------------------------------------
-# 4. SSE streaming — works against backends that implement stream_predict
+# 4. Retry config — exponential backoff for transient 5xx and connection errors
+# ---------------------------------------------------------------------------
+
+
+def retry_example() -> None:
+    print("\n--- retry config ---")
+    retry = RetryConfig(
+        max_attempts=3,
+        backoff_factor=0.5,  # 0.5s, 1.0s, 2.0s, ...
+        retry_on_status=(502, 503, 504),
+        retry_on_connection_errors=True,
+    )
+    with SheafClient(base_url=BASE_URL, retry=retry) as client:
+        # If the server is up, this just succeeds without retries.
+        # If the server is briefly down (502/503/504) or refusing
+        # connections, the client will try up to 3 times with backoff.
+        try:
+            resp = client.predict(
+                DEPLOYMENT,
+                TimeSeriesRequest(
+                    model_name=DEPLOYMENT,
+                    history=[1.0, 2.0, 3.0],
+                    horizon=2,
+                    frequency=Frequency.HOURLY,
+                ),
+            )
+            print(f"retry-protected predict ok: horizon={resp.horizon}")
+        except ServerError as e:
+            print(f"retries exhausted: {e.detail[:80]} request_id={e.request_id}")
+
+
+# ---------------------------------------------------------------------------
+# 5. SSE streaming — works against backends that implement stream_predict
 # ---------------------------------------------------------------------------
 
 
@@ -165,6 +207,7 @@ def main() -> None:
 
     asyncio.run(async_predict())
     error_examples()
+    retry_example()
     asyncio.run(streaming_example())
 
 

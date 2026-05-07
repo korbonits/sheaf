@@ -227,10 +227,54 @@ with SheafClient(base_url="http://localhost:8000") as client:
 
 The client is in core deps (`httpx`), so `pip install sheaf-serve` includes it — no separate package, no codegen, no schema drift.  When you add a new request/response pair under `src/sheaf/api/`, register both classes in `src/sheaf/api/union.py` (`AnyRequest` and `AnyResponse`) so both the server's discriminator and the client's typed decoding pick them up automatically.
 
+Retry, error correlation, OpenAPI:
+
+```python
+from sheaf.client import RetryConfig, SheafClient
+
+retry = RetryConfig(
+    max_attempts=3,
+    backoff_factor=0.5,                  # 0.5s, 1.0s, 2.0s, ...
+    retry_on_status=(502, 503, 504),     # transient server errors
+    retry_on_connection_errors=True,
+)
+client = SheafClient(base_url="...", retry=retry)
+```
+
+Default is no retry (`max_attempts=1`).  Streaming bypasses retry by design — replaying a partial stream would interleave progress events from two backend invocations.
+
+Every raised `SheafError` (and `ValidationError` / `ServerError` / `ClientError`) carries `e.request_id`, the UUID minted on the request.  Use it for log correlation when re-raising at a service boundary, without holding onto the original request.
+
+```python
+try:
+    client.predict("flux", req)
+except ServerError as e:
+    logger.error("predict failed", extra={"request_id": e.request_id, "detail": e.detail})
+```
+
+OpenAPI export — for generating non-Python clients (TypeScript, Go, …) or pinning the contract in release artifacts:
+
+```bash
+# CLI: dotted-path to a list[ModelSpec]
+python -m sheaf.openapi --specs my_specs:specs > openapi.json
+```
+
+Or programmatically:
+
+```python
+from sheaf.openapi import generate
+schema = generate(specs)  # FastAPI-generated OpenAPI 3 dict
+```
+
+Backends are NOT loaded during OpenAPI generation, so it runs without GPU or model weights.  The schema uses templated paths (`/{name}/predict`, `/{name}/health`, …) since `ModalServer` registers routes once with `name` as a path parameter.
+
 Tests:
 - `tests/test_client.py` covers each client method against `httpx.MockTransport` (no app).
 - `tests/test_client_integration.py` drives the real `_build_asgi_app` ASGI app via `httpx.ASGITransport` — closes the gap between unit tests and the `SHEAF_SMOKE_TEST=1` Ray Serve smoke.
-- `tests/test_client_stream.py` covers the SSE event parsing path.
+- `tests/test_client_stream.py` — SSE event parsing.
+- `tests/test_client_retry.py` — backoff + retry semantics; mocks `time.sleep` / `asyncio.sleep` so tests run instantly.
+- `tests/test_client_request_id.py` — request_id propagation onto every raised exception.
+- `tests/test_openapi.py` — `generate()` schema shape and the CLI's dotted-path resolution.
 
 ## LoRA adapter multiplexing
 

@@ -254,15 +254,16 @@ New model types:
 - [x] Bucket-by-resolved-adapter inside Ray Serve batch windows: `set_active_adapters` is called exactly once per homogeneous sub-batch
 - [ ] Hot-add adapters at runtime without `ModelServer.update(spec)` (deferred — adds VRAM-eviction / index-sync surface area)
 
-**v0.9 — typed Python client (Track 1 complete)**
+**v0.9 — typed Python client (complete)**
 
 Ships as `sheaf.client` inside `sheaf-serve` (not a separate `sheaf-client` PyPI package — schemas stay in one tree, no codegen, no drift).  Splittable into its own package later if external client contributors arrive or install footprint becomes a real cost.
 
 - [x] `SheafClient` (sync) + `AsyncSheafClient` (async, `httpx`-backed); typed `predict(deployment, request) -> response` against the discriminated `AnyResponse` union
-- [x] `health()` / `ready()` helpers; structured exceptions (`ValidationError` for 422, `ServerError` for 500, `ClientError` for transport failures)
+- [x] `health()` / `ready()` helpers; structured exceptions (`ValidationError` for 422, `ServerError` for 5xx, `ClientError` for transport / decode failures)
 - [x] SSE streaming via `client.stream(deployment, request)` async generator
-- [ ] Retry config; surface server-side `request_id` to the client for log correlation
-- [ ] Language-agnostic: publish OpenAPI spec from FastAPI so teams can `openapi-python-client` etc. for non-Python languages
+- [x] `RetryConfig` with exponential backoff: configurable status codes, connection-error retry toggle, and `max_attempts` cap.  Streams bypass retry by design (re-running yields interleaved progress events).
+- [x] Server-side `request_id` (the UUID minted on the request) is attached to every raised `SheafError` subclass so callers can log-correlate without holding the original request object.
+- [x] OpenAPI export via `python -m sheaf.openapi --specs my_module:specs > openapi.json` (or `sheaf.openapi.generate(specs)` programmatically) — backends are not loaded during generation, so it runs without GPU.
 
 ---
 
