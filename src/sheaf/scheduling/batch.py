@@ -23,6 +23,15 @@ class BatchPolicy(BaseModel):
 
                     ``None`` (default): all requests in a batch window are
                     sent to the backend in a single call.
+
+                    When the deployment's ``ModelSpec.lora`` is set, requests
+                    are *additionally* grouped by their resolved LoRA adapter
+                    selection — that grouping is automatic and cannot be
+                    disabled (``pipeline.set_adapters`` is process-global
+                    state, so concurrent requests with different adapters
+                    must dispatch separately).  ``bucket_by`` and
+                    ``ModelSpec.lora`` are mutually exclusive in v1; the
+                    spec validator rejects the combination.
     """
 
     max_batch_size: int = Field(default=32, gt=0)

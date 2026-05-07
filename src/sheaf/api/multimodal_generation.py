@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 
@@ -32,6 +32,14 @@ class MultimodalGenerationRequest(BaseRequest):
             generation closer to the prompt.  Default 7.5.
         negative_prompt: Text description of what to avoid in the output.
         seed: Random seed for reproducibility.  None = random.
+        adapters: Names of LoRA adapters to apply, in order.  Each name must
+            be registered on the deployment's ``ModelSpec.lora.adapters``.
+            Empty (default) means the deployment default is used (or no LoRA
+            if no default is set).
+        adapter_weights: Per-adapter weights, parallel to ``adapters``.  When
+            ``None`` (default), the per-adapter ``weight`` from
+            ``LoRAConfig.adapters[name]`` is used.  Length must match
+            ``adapters`` when provided.
     """
 
     model_type: Literal[ModelType.MULTIMODAL_GENERATION] = (
@@ -46,6 +54,8 @@ class MultimodalGenerationRequest(BaseRequest):
     guidance_scale: float = Field(default=7.5, ge=0.0)
     negative_prompt: str = ""
     seed: int | None = None
+    adapters: list[str] = Field(default_factory=list)
+    adapter_weights: list[float] | None = None
 
     @field_validator("prompt")
     @classmethod
@@ -73,6 +83,18 @@ class MultimodalGenerationRequest(BaseRequest):
         except Exception as e:
             raise ValueError("mask_b64 must be valid base64-encoded bytes") from e
         return v
+
+    @model_validator(mode="after")
+    def _validate_adapters(self) -> MultimodalGenerationRequest:
+        if self.adapter_weights is not None:
+            if not self.adapters:
+                raise ValueError("adapter_weights provided but adapters is empty")
+            if len(self.adapter_weights) != len(self.adapters):
+                raise ValueError(
+                    f"adapter_weights length ({len(self.adapter_weights)}) "
+                    f"must match adapters length ({len(self.adapters)})"
+                )
+        return self
 
 
 class MultimodalGenerationResponse(BaseResponse):

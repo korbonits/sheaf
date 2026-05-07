@@ -33,6 +33,8 @@ from sheaf.api.multimodal_generation import (
     MultimodalGenerationResponse,
 )
 from sheaf.backends.base import ModelBackend
+from sheaf.lora import LoRAAdapter
+from sheaf.lora import parse_source as _parse_lora_source
 from sheaf.registry import register_backend
 
 _VALID_MODES = {"img2img", "inpaint"}
@@ -113,6 +115,40 @@ class SDXLBackend(ModelBackend):
             self._pipeline = self._pipeline.to(self._device)
 
         self._Image = _Image
+
+    # ------------------------------------------------------------------
+    # LoRA adapter multiplexing
+    # ------------------------------------------------------------------
+
+    def supports_lora(self) -> bool:
+        return True
+
+    def load_adapters(self, adapters: dict[str, LoRAAdapter]) -> None:
+        if self._pipeline is None:
+            raise RuntimeError("Backend not loaded. Call load() first.")
+        for name, adapter in adapters.items():
+            path_or_repo, weight_name = _parse_lora_source(adapter.source)
+            kwargs: dict[str, Any] = {"adapter_name": name}
+            if weight_name is not None:
+                kwargs["weight_name"] = weight_name
+            self._pipeline.load_lora_weights(path_or_repo, **kwargs)
+
+    def set_active_adapters(self, names: list[str], weights: list[float]) -> None:
+        if self._pipeline is None:
+            raise RuntimeError("Backend not loaded. Call load() first.")
+        if len(names) != len(weights):
+            raise ValueError(
+                f"names length ({len(names)}) must equal weights length "
+                f"({len(weights)})"
+            )
+        # Empty names means "no LoRA for this sub-batch".  Diffusers'
+        # set_adapters([], []) raises KeyError rather than disabling —
+        # disable_lora() is the supported off-switch.
+        if not names:
+            self._pipeline.disable_lora()
+            return
+        self._pipeline.enable_lora()
+        self._pipeline.set_adapters(names, adapter_weights=weights)
 
     def predict(self, request: BaseRequest) -> BaseResponse:
         if not isinstance(request, MultimodalGenerationRequest):

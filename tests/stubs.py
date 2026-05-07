@@ -39,6 +39,7 @@ from sheaf.api.time_series import TimeSeriesRequest, TimeSeriesResponse
 from sheaf.api.video import VideoRequest, VideoResponse
 from sheaf.api.weather import WeatherRequest, WeatherResponse
 from sheaf.backends.base import ModelBackend
+from sheaf.lora import LoRAAdapter
 from sheaf.registry import register_backend
 
 
@@ -443,6 +444,76 @@ class SmokeTabularBackend(ModelBackend):
             task=request.task,
             n_context=len(request.context_X),
             n_query=n,
+        )
+
+
+@register_backend("_smoke_lora_diffusion")
+class SmokeLoRADiffusionBackend(ModelBackend):
+    """Diffusion stub that opts in to LoRA and records adapter calls.
+
+    Records every load_adapters / set_active_adapters call as class-level
+    state so tests can inspect call order across an entire deployment's
+    lifetime without holding a backend reference.
+    """
+
+    loaded_adapters: list[dict[str, LoRAAdapter]] = []
+    set_calls: list[tuple[list[str], list[float]]] = []
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.loaded_adapters = []
+        cls.set_calls = []
+
+    def load(self) -> None:
+        pass
+
+    @property
+    def model_type(self) -> str:
+        return ModelType.DIFFUSION
+
+    def supports_lora(self) -> bool:
+        return True
+
+    def load_adapters(self, adapters: dict[str, LoRAAdapter]) -> None:
+        SmokeLoRADiffusionBackend.loaded_adapters.append(dict(adapters))
+
+    def set_active_adapters(self, names: list[str], weights: list[float]) -> None:
+        SmokeLoRADiffusionBackend.set_calls.append((list(names), list(weights)))
+
+    def predict(self, request: BaseRequest) -> BaseResponse:
+        import struct
+        import zlib
+
+        assert isinstance(request, DiffusionRequest)
+
+        def _png(w: int, h: int) -> bytes:
+            raw = b"\x00" + b"\xff\xff\xff" * w
+            scanlines = raw * h
+            compressed = zlib.compress(scanlines)
+
+            def chunk(tag: bytes, data: bytes) -> bytes:
+                c = tag + data
+                return (
+                    struct.pack(">I", len(data))
+                    + c
+                    + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+                )
+
+            return (
+                b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                + chunk(b"IDAT", compressed)
+                + chunk(b"IEND", b"")
+            )
+
+        png_bytes = _png(request.width, request.height)
+        return DiffusionResponse(
+            request_id=request.request_id,
+            model_name=request.model_name,
+            image_b64=base64.b64encode(png_bytes).decode(),
+            height=request.height,
+            width=request.width,
+            seed=request.seed or 0,
         )
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 
@@ -26,6 +26,14 @@ class DiffusionRequest(BaseRequest):
             steer generation closer to the prompt.  FLUX.1-schnell uses
             0.0 (guidance-distilled); FLUX.1-dev typically uses 3.5–7.0.
         seed: Random seed for reproducibility.  None = random.
+        adapters: Names of LoRA adapters to apply, in order of application.
+            Each name must be registered on the deployment's
+            ``ModelSpec.lora.adapters``.  Empty (default) means the deployment
+            default adapter is used (or no LoRA if no default is set).
+        adapter_weights: Per-adapter weights, parallel to ``adapters``.  When
+            ``None`` (default), the per-adapter ``weight`` from
+            ``LoRAConfig.adapters[name]`` is used.  When provided, the length
+            must match ``adapters``.
     """
 
     model_type: Literal[ModelType.DIFFUSION] = ModelType.DIFFUSION
@@ -37,6 +45,8 @@ class DiffusionRequest(BaseRequest):
     num_inference_steps: int = Field(default=4, ge=1, le=200)
     guidance_scale: float = Field(default=0.0, ge=0.0)
     seed: int | None = None
+    adapters: list[str] = Field(default_factory=list)
+    adapter_weights: list[float] | None = None
 
     @field_validator("prompt")
     @classmethod
@@ -44,6 +54,18 @@ class DiffusionRequest(BaseRequest):
         if not v.strip():
             raise ValueError("prompt must not be empty")
         return v
+
+    @model_validator(mode="after")
+    def _validate_adapters(self) -> DiffusionRequest:
+        if self.adapter_weights is not None:
+            if not self.adapters:
+                raise ValueError("adapter_weights provided but adapters is empty")
+            if len(self.adapter_weights) != len(self.adapters):
+                raise ValueError(
+                    f"adapter_weights length ({len(self.adapter_weights)}) "
+                    f"must match adapters length ({len(self.adapters)})"
+                )
+        return self
 
 
 class DiffusionResponse(BaseResponse):

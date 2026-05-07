@@ -74,6 +74,7 @@ from sheaf.api.video import VideoRequest
 from sheaf.api.weather import WeatherRequest
 from sheaf.cache import _DISABLED as _CACHE_DISABLED
 from sheaf.cache import ResponseCache
+from sheaf.lora import resolve_active_adapters
 from sheaf.metrics import record_predict, register_metrics_endpoint, time_load
 from sheaf.spec import ModelSpec
 from sheaf.tracing import configure_tracing, record_exception, trace_predict, trace_span
@@ -175,6 +176,23 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
         with time_load(spec.name, spec.model_type):
             backend.load()
 
+        if spec.lora is not None:
+            if not backend.supports_lora():
+                raise ValueError(
+                    f"ModelSpec '{spec.name}' configured with LoRA adapters "
+                    f"but backend {type(backend).__name__} does not support "
+                    f"them (supports_lora() returned False)."
+                )
+            backend.load_adapters(spec.lora.adapters)
+            _logger.info(
+                "LoRA adapters loaded",
+                extra={
+                    "deployment": spec.name,
+                    "adapters": list(spec.lora.adapters),
+                    "default": spec.lora.default,
+                },
+            )
+
         feast = None
         if spec.feast_repo_path:
             from sheaf.integrations.feast import FeastResolver
@@ -230,6 +248,38 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
         spec, _, _feast = _backends[name]
         return {"status": "ready", "model": spec.name}
 
+    def _apply_lora(spec: ModelSpec, backend: Any, request: Any) -> None:
+        """Validate request adapters against spec.lora; call set_active_adapters.
+
+        Modal serves requests one-at-a-time per container slot (the default
+        ``allow_concurrent_inputs=1``); ``set_active_adapters`` is therefore
+        safe to call inline.  Raising the concurrency knob without sharding
+        adapter selection is the caller's responsibility.
+        """
+        request_adapters = list(getattr(request, "adapters", None) or [])
+        if request_adapters:
+            if spec.lora is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Request specifies adapters {request_adapters} but "
+                        f"deployment '{spec.name}' has no LoRA configured."
+                    ),
+                )
+            unknown = [n for n in request_adapters if n not in spec.lora.adapters]
+            if unknown:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Unknown adapter(s) {unknown}; deployment "
+                        f"'{spec.name}' has: {sorted(spec.lora.adapters)}"
+                    ),
+                )
+        if spec.lora is not None:
+            names, weights = resolve_active_adapters(request, spec.lora)
+            if names:
+                backend.set_active_adapters(names, weights)
+
     @asgi_app.post("/{name}/predict")
     async def predict(name: str, request: AnyRequest) -> dict[str, Any]:  # type: ignore[valid-type]
         if name not in _backends:
@@ -243,6 +293,8 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                     f"got '{request.model_type}'"
                 ),
             )
+
+        _apply_lora(spec, backend, request)
 
         with trace_predict(
             name,
@@ -340,6 +392,8 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                     f"got '{request.model_type}'"
                 ),
             )
+
+        _apply_lora(spec, backend, request)
 
         _feature_ref = getattr(request, "feature_ref", None)
         if _feature_ref is not None:

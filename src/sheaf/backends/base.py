@@ -3,9 +3,12 @@
 import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sheaf.api.base import BaseRequest, BaseResponse
+
+if TYPE_CHECKING:
+    from sheaf.lora import LoRAAdapter
 
 
 class ModelBackend(ABC):
@@ -77,3 +80,56 @@ class ModelBackend(ABC):
     def model_type(self) -> str:
         """The ModelType this backend serves."""
         ...
+
+    # ------------------------------------------------------------------
+    # LoRA adapter multiplexing — opt-in
+    # ------------------------------------------------------------------
+
+    def supports_lora(self) -> bool:
+        """Whether this backend can host LoRA adapters.
+
+        Default ``False``.  Override and return ``True`` in backends that
+        implement :meth:`load_adapters` and :meth:`set_active_adapters`.
+        """
+        return False
+
+    def load_adapters(self, adapters: dict[str, "LoRAAdapter"]) -> None:
+        """Load a registry of named LoRA adapters into the backend.
+
+        Called once by ``_SheafDeployment.__init__`` (or the Modal startup
+        path) after ``load()``.  Implementations should iterate the mapping
+        and load each adapter under its dict key as the adapter name.
+
+        Args:
+            adapters: Mapping of adapter name → :class:`sheaf.lora.LoRAAdapter`.
+                Adapter sources may be local paths or ``hf:`` references; the
+                backend is responsible for parsing the source string.
+
+        Raises:
+            NotImplementedError: Default — backends that return ``True`` from
+                :meth:`supports_lora` must override.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support LoRA adapters"
+        )
+
+    def set_active_adapters(self, names: list[str], weights: list[float]) -> None:
+        """Activate a subset of previously loaded adapters with given weights.
+
+        Called per sub-batch (after ``bucket_by_adapter`` grouping) before
+        ``async_batch_predict``.  ``names`` is empty for a no-LoRA call.
+
+        Args:
+            names:   Adapter names to activate.  Each must be a key passed to
+                a prior :meth:`load_adapters` call.  Empty list means
+                "deactivate all adapters" (run with the base model only).
+            weights: Per-adapter weights, parallel to ``names``.  Length must
+                match ``names``.
+
+        Raises:
+            NotImplementedError: Default — backends that return ``True`` from
+                :meth:`supports_lora` must override.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support LoRA adapters"
+        )

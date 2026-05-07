@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from sheaf.api.base import ModelType
 from sheaf.cache import CacheConfig
+from sheaf.lora import LoRAConfig
 from sheaf.scheduling.batch import BatchPolicy
 
 
@@ -70,3 +71,25 @@ class ModelSpec(BaseModel):
             "``SHEAF_CACHE_DISABLED=1`` overrides this at the process level."
         ),
     )
+    lora: LoRAConfig | None = Field(
+        default=None,
+        description=(
+            "LoRA adapter registry.  When set, the backend must implement "
+            "``supports_lora()``/``load_adapters()``/``set_active_adapters()``. "
+            "Adapters are loaded once at deploy time; per-request selection is "
+            "via the ``adapters`` and ``adapter_weights`` request fields. "
+            "Cannot be combined with ``batch_policy.bucket_by`` — when ``lora`` "
+            "is set, requests are automatically grouped by their resolved "
+            "adapter selection inside each batch window."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _validate_lora_bucket_by(self) -> ModelSpec:
+        if self.lora is not None and self.batch_policy.bucket_by is not None:
+            raise ValueError(
+                "ModelSpec.lora and BatchPolicy.bucket_by are mutually "
+                "exclusive in v1: when 'lora' is set, requests are grouped "
+                "by adapter selection automatically.  Pick one."
+            )
+        return self

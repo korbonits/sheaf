@@ -49,6 +49,7 @@ from sheaf.api.union import AnyRequest
 from sheaf.backends.base import ModelBackend
 from sheaf.cache import _DISABLED as _CACHE_DISABLED
 from sheaf.cache import ResponseCache
+from sheaf.lora import bucket_with_adapter_resolution, resolve_active_adapters
 from sheaf.metrics import (
     record_batch,
     record_predict,
@@ -147,6 +148,24 @@ class _SheafDeployment:
             },
         )
 
+        # LoRA adapter loading — backend must opt in via supports_lora().
+        if spec.lora is not None:
+            if not self._backend.supports_lora():
+                raise ValueError(
+                    f"ModelSpec '{spec.name}' configured with LoRA adapters "
+                    f"but backend {type(self._backend).__name__} does not "
+                    f"support them (supports_lora() returned False)."
+                )
+            self._backend.load_adapters(spec.lora.adapters)
+            _logger.info(
+                "LoRA adapters loaded",
+                extra={
+                    "deployment": spec.name,
+                    "adapters": list(spec.lora.adapters),
+                    "default": spec.lora.default,
+                },
+            )
+
         # Feast resolver — only initialised when the spec provides a repo path.
         self._feast: Any = None
         if spec.feast_repo_path:
@@ -224,6 +243,28 @@ class _SheafDeployment:
                     f"got '{request.model_type}'"
                 ),
             )
+
+        _request_adapters = getattr(request, "adapters", None) or []
+        if _request_adapters:
+            if self._spec.lora is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Request specifies adapters {_request_adapters} but "
+                        f"deployment '{self._spec.name}' has no LoRA configured."
+                    ),
+                )
+            _unknown = [
+                n for n in _request_adapters if n not in self._spec.lora.adapters
+            ]
+            if _unknown:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Unknown adapter(s) {_unknown}; deployment "
+                        f"'{self._spec.name}' has: {sorted(self._spec.lora.adapters)}"
+                    ),
+                )
 
         with trace_predict(
             self._spec.name,
@@ -320,6 +361,38 @@ class _SheafDeployment:
                 ),
             )
 
+        _stream_adapters = getattr(request, "adapters", None) or []
+        if _stream_adapters:
+            if self._spec.lora is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Request specifies adapters {_stream_adapters} but "
+                        f"deployment '{self._spec.name}' has no LoRA configured."
+                    ),
+                )
+            _unknown = [
+                n for n in _stream_adapters if n not in self._spec.lora.adapters
+            ]
+            if _unknown:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Unknown adapter(s) {_unknown}; deployment "
+                        f"'{self._spec.name}' has: {sorted(self._spec.lora.adapters)}"
+                    ),
+                )
+            # Stream activates the resolved adapters before backend.stream_predict.
+            _resolved_names, _resolved_weights = resolve_active_adapters(
+                request, self._spec.lora
+            )
+            self._backend.set_active_adapters(_resolved_names, _resolved_weights)
+        elif self._spec.lora is not None and self._spec.lora.default is not None:
+            _resolved_names, _resolved_weights = resolve_active_adapters(
+                request, self._spec.lora
+            )
+            self._backend.set_active_adapters(_resolved_names, _resolved_weights)
+
         _feature_ref = getattr(request, "feature_ref", None)
         if _feature_ref is not None:
             if self._feast is None:
@@ -360,15 +433,39 @@ class _SheafDeployment:
         The decorator defaults (32 / 50 ms) are overridden per deployment by
         __init__ using the ModelSpec.batch_policy values.
 
-        When ``batch_policy.bucket_by`` is set, requests are grouped by the
-        value of that field before being dispatched to the backend, so each
-        ``async_batch_predict`` call receives a homogeneous sub-batch.  This
-        avoids forced padding when sequences of different lengths land in the
-        same Ray Serve batch window (e.g. time-series requests with different
-        ``horizon`` values, or video requests with different frame counts).
+        Two grouping modes:
+
+          - When ``batch_policy.bucket_by`` is set, requests are grouped by
+            the value of that field before being dispatched to the backend,
+            so each ``async_batch_predict`` call receives a homogeneous
+            sub-batch (e.g. time-series ``horizon`` or video ``n_frames``).
+          - When ``ModelSpec.lora`` is set, requests are grouped by their
+            *resolved* (names, weights) adapter selection.  ``set_active_adapters``
+            is called once per group before dispatch, since
+            ``pipeline.set_adapters`` is process-global state that cannot be
+            shared across concurrent requests with different adapters.
+
+        These two modes are mutually exclusive (enforced by ``ModelSpec``).
         Results are reassembled in the original arrival order before return.
         """
         record_batch(self._spec.name, len(requests))
+
+        if self._spec.lora is not None:
+            lora_groups = bucket_with_adapter_resolution(requests, self._spec.lora)
+            if (
+                len(lora_groups) == 1
+                and not lora_groups[0][2]  # no active adapters anywhere
+            ):
+                responses = await self._backend.async_batch_predict(lora_groups[0][1])
+                return [r.model_dump(mode="json") for r in responses]
+            slot: dict[int, dict[str, Any]] = {}
+            for indices, sub_reqs, names, weights in lora_groups:
+                self._backend.set_active_adapters(names, weights)
+                bucket_responses = await self._backend.async_batch_predict(sub_reqs)
+                for idx, resp in zip(indices, bucket_responses):
+                    slot[idx] = resp.model_dump(mode="json")
+            return [slot[i] for i in range(len(requests))]
+
         groups = bucket_requests(requests, self._spec.batch_policy.bucket_by)
         if len(groups) == 1:
             # Common path: no bucketing, or all requests share the same value.
@@ -376,7 +473,7 @@ class _SheafDeployment:
             return [r.model_dump(mode="json") for r in responses]
 
         # Multiple buckets — dispatch each independently, reassemble in order.
-        slot: dict[int, dict[str, Any]] = {}
+        slot = {}
         for indices, sub_reqs in groups:
             bucket_responses = await self._backend.async_batch_predict(sub_reqs)
             for idx, resp in zip(indices, bucket_responses):
