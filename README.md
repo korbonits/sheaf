@@ -253,6 +253,7 @@ New model types:
 - [x] Local paths and HF Hub sources both supported (`hf:org/repo[:weight_file]` convention)
 - [x] Bucket-by-resolved-adapter inside Ray Serve batch windows: `set_active_adapters` is called exactly once per homogeneous sub-batch
 - [ ] Hot-add adapters at runtime without `ModelServer.update(spec)` (deferred — adds VRAM-eviction / index-sync surface area)
+- [ ] Expose `enable_sequential_cpu_offload` on `FluxBackend` so FLUX + LoRA fits on 16-24 GB GPUs (currently only `enable_model_cpu_offload`, which leaves ~22 GB resident — Modal LoRA quickstart needs A100 today, this would unlock A10G)
 
 **v0.9 — typed Python client (complete)**
 
@@ -264,6 +265,14 @@ Ships as `sheaf.client` inside `sheaf-serve` (not a separate `sheaf-client` PyPI
 - [x] `RetryConfig` with exponential backoff: configurable status codes, connection-error retry toggle, and `max_attempts` cap.  Streams bypass retry by design (re-running yields interleaved progress events).
 - [x] Server-side `request_id` (the UUID minted on the request) is attached to every raised `SheafError` subclass so callers can log-correlate without holding the original request object.
 - [x] OpenAPI export via `python -m sheaf.openapi --specs my_module:specs > openapi.json` (or `sheaf.openapi.generate(specs)` programmatically) — backends are not loaded during generation, so it runs without GPU.
+
+**v0.10 — container + Kubernetes deployment**
+
+Today sheaf ships three deployment paths: `ModelServer` (a local Ray cluster you bring), `ModalServer` (Modal serverless), and `BatchRunner` / `SheafWorker` (offline / async).  Production K8s clusters running their own Ray are common and have no first-class story yet — every team rolls their own image.
+
+- [ ] Reference `Dockerfile` (multi-stage, uv-based; CPU base + CUDA variant) so teams aren't building this from scratch.  Pinned to a sheaf release; rebuilt on tag.
+- [ ] `examples/k8s/` with a `RayService` manifest — KubeRay's canonical Ray-on-K8s shape — and a short `README.md` covering prereqs (KubeRay operator installed), `kubectl apply`, and a port-forward smoke test.
+- [ ] GitHub Actions workflow that builds + pushes the Dockerfile to `ghcr.io/korbonits/sheaf-serve:vX.Y.Z` on `v*` tag push, mirroring the PyPI publish flow.
 
 ---
 
