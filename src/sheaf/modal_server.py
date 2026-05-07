@@ -113,12 +113,20 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _build_asgi_app(specs: list[ModelSpec]) -> Any:
+def _build_asgi_app(specs: list[ModelSpec], *, load_backends: bool = True) -> Any:
     """Build a FastAPI ASGI app that serves all specs.
 
     Called once when the Modal container starts.  Loads every backend, then
     returns the FastAPI app that handles all requests for the container's
     lifetime.  ``specs`` is captured via closure and cloudpickled by Modal.
+
+    Args:
+        specs: List of ``ModelSpec``s to register routes for.
+        load_backends: When ``True`` (default), each backend's ``load()`` is
+            called and LoRA adapters / Feast resolvers are wired up.  Set to
+            ``False`` for OpenAPI / route-introspection use cases where you
+            want the FastAPI route shape without paying the cost of loading
+            real model weights.  ``sheaf.openapi.generate`` uses this path.
     """
     import importlib as _imp
     import os as _os
@@ -173,28 +181,29 @@ def _build_asgi_app(specs: list[ModelSpec]) -> Any:
                 f"Registered backends: {list(_BACKEND_REGISTRY)}"
             )
         backend = backend_cls(**spec.backend_kwargs)
-        with time_load(spec.name, spec.model_type):
-            backend.load()
+        if load_backends:
+            with time_load(spec.name, spec.model_type):
+                backend.load()
 
-        if spec.lora is not None:
-            if not backend.supports_lora():
-                raise ValueError(
-                    f"ModelSpec '{spec.name}' configured with LoRA adapters "
-                    f"but backend {type(backend).__name__} does not support "
-                    f"them (supports_lora() returned False)."
+            if spec.lora is not None:
+                if not backend.supports_lora():
+                    raise ValueError(
+                        f"ModelSpec '{spec.name}' configured with LoRA adapters "
+                        f"but backend {type(backend).__name__} does not support "
+                        f"them (supports_lora() returned False)."
+                    )
+                backend.load_adapters(spec.lora.adapters)
+                _logger.info(
+                    "LoRA adapters loaded",
+                    extra={
+                        "deployment": spec.name,
+                        "adapters": list(spec.lora.adapters),
+                        "default": spec.lora.default,
+                    },
                 )
-            backend.load_adapters(spec.lora.adapters)
-            _logger.info(
-                "LoRA adapters loaded",
-                extra={
-                    "deployment": spec.name,
-                    "adapters": list(spec.lora.adapters),
-                    "default": spec.lora.default,
-                },
-            )
 
         feast = None
-        if spec.feast_repo_path:
+        if load_backends and spec.feast_repo_path:
             from sheaf.integrations.feast import FeastResolver
 
             feast = FeastResolver(spec.feast_repo_path)
