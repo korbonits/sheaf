@@ -6096,6 +6096,7 @@ name = "sheaf-serve"
 version = "0.8.0"
 source = { editable = "." }
 dependencies = [
+    { name = "httpx" },
     { name = "numpy" },
     { name = "pydantic" },
     { name = "ray", extra = ["serve"] },
@@ -6272,6 +6273,7 @@ requires-dist = [
     { name = "faster-whisper", marker = "extra == 'audio'", specifier = ">=1.2.1" },
     { name = "feast", marker = "extra == 'feast'", specifier = ">=0.40.0" },
     { name = "graphcast", marker = "extra == 'weather'", specifier = ">=0.1.0,<1.0.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
     { name = "httpx", marker = "extra == 'worker'", specifier = ">=0.27.0" },
     { name = "jax", marker = "extra == 'weather'", specifier = ">=0.4.25" },

@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.8.0 shipped (LoRA adapter multiplexing for FLUX + SDXL via `sheaf.lora`)
+## Current state: v0.8.0 on PyPI (LoRA adapter multiplexing); v0.9 typed Python client (`sheaf.client`) Track 1 in working tree
 
 Per-version ship notes live in git history and release tags. This doc tracks what exists *now* and the non-obvious design choices behind it. For feature-level changelog, see `git log`.
 
