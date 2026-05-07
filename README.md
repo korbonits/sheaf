@@ -144,9 +144,16 @@ See [`examples/`](examples/) for time series comparison, tabular, audio, vision,
 | Cross-modal embeddings | ✅ v0.3 | ImageBind (text, vision, audio, depth, thermal) |
 | Feast feature store | ✅ v0.3 | Any Feast online store (SQLite, Redis, DynamoDB, …) |
 | Modal serverless | ✅ v0.3 | `ModalServer` — zero-infra GPU deployment |
-| Diffusion / image gen | 🔜 v0.4 | FLUX |
-| Neural operators | 🔜 v0.4 | FNO, DeepONet |
-| Video understanding | 🔜 v0.4 | VideoMAE, TimeSformer |
+| Diffusion / image gen | ✅ v0.4 | FLUX (schnell, dev) |
+| Video understanding | ✅ v0.4 | VideoMAE, TimeSformer |
+| LiDAR / 3D point cloud | ✅ v0.5 | PointNet (pure PyTorch; embed + ModelNet40 classify) |
+| Pose estimation | ✅ v0.5 | ViTPose (COCO 17-keypoint, optional person bboxes) |
+| Optical flow | ✅ v0.5 | RAFT (raft_large / raft_small via torchvision) |
+| Multimodal generation | ✅ v0.5 | SDXL img2img + inpainting |
+| Speech synthesis | ✅ v0.5 | Kokoro (voice + speed per request) |
+| Offline batch inference | ✅ v0.6 | `BatchRunner` (Ray Data; tasks + actor-pool modes) |
+| Async-job worker | ✅ v0.7 | `SheafWorker` (Redis Streams; pluggable queue/result ABCs) |
+| LoRA adapter multiplexing | ✅ v0.8 | FLUX, SDXL via `ModelSpec.lora` (local paths + HF Hub sources) |
 
 ## Roadmap to production
 
@@ -203,27 +210,29 @@ New model types:
 - [x] Multimodal generation — text+image-conditioned (SDXL img2img + inpainting; install with `pip install 'sheaf-serve[multimodal-generation]'`)
 - [x] Speech synthesis with fine-grained control (Kokoro — voice + speed per request; install with `pip install 'sheaf-serve[kokoro]'`)
 
-**v0.6 — batch inference + async jobs**
+**v0.6 — offline batch inference (complete)**
 
-The goal: cover every shape of production inference, not just synchronous HTTP.
-
-Offline / batch:
 - [x] `BatchRunner` — same backend, same typed contract, offline batch mode; Ray Data `map_batches` substrate, stateless tasks with a worker-local backend cache so `load()` fires once per worker (not once per batch); install with `pip install 'sheaf-serve[batch]'`
 - [x] `BatchSpec` — mirrors `ModelSpec` for backend selection; `JsonlSource`/`JsonlSink` in v1; new sources/sinks (S3, Parquet, Delta) slot in as additional `BatchSource`/`BatchSink` subclasses without changing the runner API
-- [ ] Resumable checkpointing across process restarts ([#12](https://github.com/korbonits/sheaf/issues/12))
 - [x] Actor-pool execution mode for warm loads on expensive backends (FLUX, GraphCast, SDXL) — opt-in via `BatchSpec.compute="actors"` + `num_actors=N`; `load()` runs once per actor at `__init__` and persists for the actor's lifetime ([#13](https://github.com/korbonits/sheaf/issues/13))
+- [ ] Resumable checkpointing across process restarts ([#12](https://github.com/korbonits/sheaf/issues/12))
 
-Async job queue:
+**v0.7 — async-job queue (complete)**
+
 - [x] `SheafWorker` — queue-consumer pattern for long-running inference; v1 ships Redis Streams + consumer groups (horizontal scaling), pluggable `JobQueue` / `ResultStore` ABCs for SQS / Kafka follow-ups; install with `pip install 'sheaf-serve[worker]'`
-- [x] Job lifecycle: enqueue → processing → result / dead-letter; per-job webhook on completion (best-effort POST)
+- [x] Job lifecycle: enqueue → processing → result / dead-letter; at-least-once delivery via XACK-after-persist; per-job webhook on completion (best-effort POST)
 - [ ] Priority lanes + per-tenant fair queuing
 
-**v0.7 — adapter multiplexing + client SDK**
+**v0.8 — LoRA adapter multiplexing (complete)**
 
-Adapter multiplexing:
-- [ ] LoRA / adapter hot-swap per request — one GPU deployment serves many fine-tunes; `adapters` dict on `ModelSpec`, `adapter_id` field in requests
-- [ ] Adapter registry: load on demand, LRU eviction when VRAM is tight
-- [ ] First targets: FLUX (style LoRAs), Whisper (language adapters), ESM-3 (task heads)
+- [x] `ModelSpec.lora = LoRAConfig(adapters={...}, default="...")` — declare per-deployment adapter registry; one GPU deployment serves many fine-tunes
+- [x] Per-request adapter selection via `DiffusionRequest.adapters` / `MultimodalGenerationRequest.adapters` (with optional `adapter_weights` for fusion)
+- [x] First targets: FLUX (FLUX.1-schnell + FLUX.1-dev), SDXL (img2img + inpaint)
+- [x] Local paths and HF Hub sources both supported (`hf:org/repo[:weight_file]` convention)
+- [x] Bucket-by-resolved-adapter inside Ray Serve batch windows: `set_active_adapters` is called exactly once per homogeneous sub-batch
+- [ ] Hot-add adapters at runtime without `ModelServer.update(spec)` (deferred — adds VRAM-eviction / index-sync surface area)
+
+**Future**
 
 Client SDK:
 - [ ] `pip install sheaf-client` — typed Python client generated from request/response schemas

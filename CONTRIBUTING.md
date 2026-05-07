@@ -25,7 +25,7 @@ Each new model type needs:
 
 The time series contract (`src/sheaf/api/time_series.py`) and Chronos2 backend (`src/sheaf/backends/chronos.py`) are the reference implementation. Follow that pattern.
 
-**What's wanted now**: the original v0.5 wishlist (LiDAR, pose, optical flow, multimodal generation, controllable TTS) all shipped in v0.5.1.  Open an issue if you have a model type in mind that isn't in the table below — the contract design is the interesting part, not the integration plumbing.
+**What's wanted now**: the v0.5 wishlist (LiDAR, pose, optical flow, multimodal generation, controllable TTS) all shipped in v0.5.1; v0.6 added offline `BatchRunner`; v0.7 added the `SheafWorker` async-job queue; v0.8 added LoRA adapter multiplexing for FLUX + SDXL.  Open an issue if you have a model type in mind that isn't in the table below — the contract design is the interesting part, not the integration plumbing.
 
 ### API contract feedback
 
@@ -203,6 +203,33 @@ SheafWorker(spec).start()
 Clients enqueue via `JobQueueClient.enqueue(request, webhook_url=None)` and either poll `wait_for_result(job_id)` or wait for a webhook POST on completion.  At-least-once delivery (XACK only after persist); jobs that exceed `max_retries` go to a dead-letter stream and a `status="failed"` `JobResult` is written so polling clients don't hang.
 
 See `examples/quickstart_worker.py`.  Install with `pip install 'sheaf-serve[worker]'`.
+
+## LoRA adapter multiplexing
+
+Diffusion backends (`flux`, `sdxl`) opt in to LoRA via `supports_lora()` returning `True`.  Declare the adapter registry on the spec, and select per request:
+
+```python
+from sheaf.lora import LoRAAdapter, LoRAConfig
+
+spec = ModelSpec(
+    name="flux-loras",
+    model_type=ModelType.DIFFUSION,
+    backend="flux",
+    backend_kwargs={"model_id": "black-forest-labs/FLUX.1-schnell"},
+    resources=ResourceConfig(num_gpus=1),
+    lora=LoRAConfig(
+        adapters={
+            "sketch":     LoRAAdapter(source="/loras/sketch.safetensors", weight=0.8),
+            "watercolor": LoRAAdapter(source="hf:user/watercolor-lora",    weight=1.0),
+        },
+        default="sketch",
+    ),
+)
+```
+
+Requests pick adapters via `DiffusionRequest.adapters` (or `MultimodalGenerationRequest.adapters` for SDXL) and optionally override per-request weights via `adapter_weights`.  When `spec.lora` is set, `_SheafDeployment` automatically buckets requests by their resolved `(names, weights)` selection inside each Ray Serve batch window — `pipeline.set_adapters` is process-global state, so concurrent different-adapter requests must dispatch separately.
+
+To add LoRA support to a new backend, override `supports_lora()`, `load_adapters(adapters)`, and `set_active_adapters(names, weights)` on `ModelBackend`.  Empty `names` should disable LoRAs cleanly (e.g. `pipeline.disable_lora()` for diffusers backends — `set_adapters([], [])` raises `KeyError`).  See `src/sheaf/backends/flux.py` and `src/sheaf/backends/sdxl.py` for the reference implementation, and `examples/quickstart_flux_lora.py` (Ray Serve) / `examples/quickstart_flux_lora_modal.py` (Modal A100) for end-to-end deploy examples.
 
 ## Code style
 
