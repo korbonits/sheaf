@@ -83,6 +83,10 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/sheaf-serve
+          # latest=false disables metadata-action's default `latest=auto`
+          # flavor that would otherwise add `:latest` alongside our explicit
+          # type=raw rule below — a duplicate that confuses the push loop.
+          flavor: latest=false
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern={{version}}
@@ -249,10 +253,13 @@ jobs:
         run: |
           set -euo pipefail
           # Retag the validated local image with each metadata-emitted tag,
-          # then push.  Done as a loop because the build step used a single
-          # local tag (sheaf-serve:smoke) rather than the metadata set.
-          for tag in ${{ steps.meta.outputs.tags }}; do
+          # then push.  steps.meta.outputs.tags is a newline-separated string;
+          # iterating with `for tag in $output` would dump those newlines
+          # mid-`for ... do` and break bash syntax.  `while read` handles
+          # the multi-line input safely.
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
             echo "Tagging + pushing $tag"
             docker tag sheaf-serve:smoke "$tag"
             docker push "$tag"
-          done
+          done <<< "${{ steps.meta.outputs.tags }}"
