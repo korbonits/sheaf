@@ -211,7 +211,9 @@ jobs:
           docker tag sheaf-serve:smoke "$FROM_REF" || true  # idempotent if tier 1 already did it
           echo "Retagged sheaf-serve:smoke → $FROM_REF (matches k8s Dockerfile)"
 
-          docker build -f examples/k8s/Dockerfile -t sheaf-k8s-smoke:test .
+          # Use examples/k8s/ as the build context — the Dockerfile uses
+          # `COPY app.py .` which expects app.py at the context root.
+          docker build -f examples/k8s/Dockerfile -t sheaf-k8s-smoke:test examples/k8s/
 
           # Kind has its own Docker daemon; load the image explicitly.
           kind load docker-image sheaf-k8s-smoke:test --name sheaf-test

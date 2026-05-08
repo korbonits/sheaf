@@ -35,12 +35,15 @@ Application running.
 ### 1. Build and push the image
 
 ```bash
-docker build -f examples/k8s/Dockerfile -t YOUR_REGISTRY/sheaf-chronos:v0.9.0 .
+cd examples/k8s
+docker build -t YOUR_REGISTRY/sheaf-chronos:v0.9.0 .
 docker push YOUR_REGISTRY/sheaf-chronos:v0.9.0
 ```
 
-(Run from the repo root so the `COPY examples/k8s/app.py .` directive
-finds the file in the build context.)
+The Dockerfile uses `COPY app.py .`, so the build context must be a
+directory that has `app.py` at the root.  In production, copy this
+`Dockerfile` and `app.py` into your own project root and run
+`docker build .` there.
 
 ### 2. Update the manifest
 
