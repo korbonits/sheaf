@@ -4,8 +4,9 @@
 # core only.  This file shows the canonical pattern for adding the
 # backend extras you need + your own server script.
 #
-# Build:
-#     docker build -f examples/docker/Dockerfile -t my-sheaf:dev .
+# Build (from this directory, so `COPY server.py .` resolves):
+#     cd examples/docker
+#     docker build -t my-sheaf:dev .
 #
 # Run (CPU; bind to all interfaces inside the container so :8000
 # is reachable from the host):

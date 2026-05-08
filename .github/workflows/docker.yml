@@ -133,7 +133,9 @@ jobs:
           docker tag sheaf-serve:smoke "$FROM_REF"
           echo "Retagged sheaf-serve:smoke → $FROM_REF (matches example Dockerfile)"
 
-          docker build -f examples/docker/Dockerfile -t sheaf-docker-smoke:test .
+          # Use examples/docker/ as the build context — the Dockerfile uses
+          # `COPY server.py .` which expects server.py at the context root.
+          docker build -f examples/docker/Dockerfile -t sheaf-docker-smoke:test examples/docker/
 
           docker run -d --name sheaf-docker-smoke -p 8000:8000 sheaf-docker-smoke:test
 

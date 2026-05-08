@@ -15,11 +15,15 @@ This directory shows the extension pattern.
 
 ## Build
 
-From the repo root:
-
 ```bash
-docker build -f examples/docker/Dockerfile -t my-sheaf:dev .
+cd examples/docker
+docker build -t my-sheaf:dev .
 ```
+
+The Dockerfile uses `COPY server.py .`, so the build context must be a
+directory that has `server.py` at the root.  Real-world usage: copy this
+`Dockerfile` and `server.py` into your own project root and run
+`docker build .` there.
 
 ## Run
 
