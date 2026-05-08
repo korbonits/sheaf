@@ -229,28 +229,43 @@ jobs:
 
       - name: Tier 2 — wait for RayService serviceStatus=Running
         run: |
-          set -euo pipefail
+          set -uo pipefail   # not -e so diagnostics run even on partial fails
           # KubeRay updates .status.serviceStatus to "Running" once the head
           # pod is up and the Ray Serve Application is healthy.  Budget:
           # head pod start (~30s) + chronos download (~30s) + Ray Serve
-          # deploy (~30s) = ~90s; 5 min timeout for noisy CI variance.
-          for i in $(seq 1 60); do
+          # deploy (~30s) = ~90s; 8 min timeout for Kind + image-pull lag.
+          for i in $(seq 1 96); do
             STATUS=$(kubectl get rayservice sheaf-chronos \
               -o jsonpath='{.status.serviceStatus}' 2>/dev/null || echo "")
-            echo "Attempt $i/60: serviceStatus='$STATUS'"
+            echo "Attempt $i/96: serviceStatus='$STATUS'"
             if [ "$STATUS" = "Running" ]; then
               echo "RayService Running"
-              break
+              exit 0
+            fi
+            # Every 12 attempts (~60s), dump current pod state.  Running
+            # diagnostics live (rather than only on timeout) so we see
+            # what's happening when pods are alive — KubeRay's restart
+            # loop deletes pods between iterations, so post-failure
+            # `kubectl get pods` often returns "No resources found".
+            if [ $((i % 12)) -eq 0 ]; then
+              echo "--- live diagnostics @ attempt $i ---"
+              kubectl get pods -A 2>/dev/null | grep -vE "^(NAMESPACE|kube-system|local-path)" || true
+              kubectl get rayservice sheaf-chronos -o jsonpath='{range .status.pendingServiceStatus.rayClusterStatus}{@}{"\n"}{end}' 2>/dev/null || true
+              kubectl get events --sort-by=.lastTimestamp 2>/dev/null | tail -10 || true
+              echo "--- end diagnostics ---"
             fi
             sleep 5
-            if [ "$i" -eq 60 ]; then
-              echo "::error::RayService did not reach Running in 300s"
-              kubectl describe rayservice sheaf-chronos || true
-              kubectl get pods -l ray.io/cluster=sheaf-chronos || true
-              kubectl logs -l ray.io/cluster=sheaf-chronos --all-containers --tail=200 || true
-              exit 1
-            fi
           done
+
+          echo "::error::RayService did not reach Running in 480s"
+          kubectl describe rayservice sheaf-chronos || true
+          kubectl get pods -A || true
+          for pod in $(kubectl get pods -l ray.io/cluster=sheaf-chronos -o name 2>/dev/null); do
+            kubectl describe "$pod" || true
+            kubectl logs "$pod" --all-containers --tail=200 || true
+          done
+          kubectl logs -n default -l app.kubernetes.io/name=kuberay-operator --tail=200 || true
+          exit 1
 
       - name: Tier 2 — smoke predict via port-forward
         run: |
