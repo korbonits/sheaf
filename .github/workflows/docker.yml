@@ -93,6 +93,12 @@ jobs:
       # smoke phases below.  Push is deferred to a later step that only fires
       # if both smoke tiers pass — this guarantees we never publish an image
       # that doesn't actually serve.
+      #
+      # Tagged with a fixed local-only ref (not the metadata tags) so the
+      # smoke steps have a stable name to reference.  metadata-action's tag
+      # output is empty on workflow_dispatch (semver patterns need a v* git
+      # tag, latest is gated on event=='push', event=pr only fires on PRs),
+      # which would break any code that assumed it produced something.
       - name: Build base image (load to local daemon)
         uses: docker/build-push-action@v6
         with:
@@ -103,7 +109,7 @@ jobs:
           platforms: linux/amd64
           build-args: |
             SHEAF_VERSION=${{ env.SHEAF_VERSION }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: sheaf-serve:smoke
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -124,9 +130,8 @@ jobs:
           # Retag the just-built base to match so the build resolves locally
           # instead of pulling from GHCR (which doesn't have this version yet).
           FROM_REF=$(awk '/^FROM/{print $2; exit}' examples/docker/Dockerfile)
-          BASE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -1)
-          docker tag "$BASE_TAG" "$FROM_REF"
-          echo "Retagged $BASE_TAG → $FROM_REF (matches example Dockerfile)"
+          docker tag sheaf-serve:smoke "$FROM_REF"
+          echo "Retagged sheaf-serve:smoke → $FROM_REF (matches example Dockerfile)"
 
           docker build -f examples/docker/Dockerfile -t sheaf-docker-smoke:test .
 
@@ -201,9 +206,8 @@ jobs:
           # Same retag trick as Tier 1 — make the FROM in the k8s example
           # Dockerfile resolve to the just-built base in the local daemon.
           FROM_REF=$(awk '/^FROM/{print $2; exit}' examples/k8s/Dockerfile)
-          BASE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -1)
-          docker tag "$BASE_TAG" "$FROM_REF" || true  # idempotent if tier 1 already did it
-          echo "Retagged $BASE_TAG → $FROM_REF (matches k8s Dockerfile)"
+          docker tag sheaf-serve:smoke "$FROM_REF" || true  # idempotent if tier 1 already did it
+          echo "Retagged sheaf-serve:smoke → $FROM_REF (matches k8s Dockerfile)"
 
           docker build -f examples/k8s/Dockerfile -t sheaf-k8s-smoke:test .
 
@@ -290,7 +294,11 @@ jobs:
         if: github.event_name == 'push'
         run: |
           set -euo pipefail
+          # Retag the validated local image with each metadata-emitted tag,
+          # then push.  Done as a loop because the build step used a single
+          # local tag (sheaf-serve:smoke) rather than the metadata set.
           for tag in ${{ steps.meta.outputs.tags }}; do
-            echo "Pushing $tag"
+            echo "Tagging + pushing $tag"
+            docker tag sheaf-serve:smoke "$tag"
             docker push "$tag"
           done
