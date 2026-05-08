@@ -1,0 +1,60 @@
+# Build context exclusions — keep the Docker build context tiny.
+# The base Dockerfile installs sheaf-serve from PyPI and does NOT COPY any
+# repo files, so almost everything here is excluded.  Derived images that
+# COPY their own source should maintain their own .dockerignore.
+
+# VCS
+.git
+.gitignore
+.gitattributes
+.github
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Python build artifacts
+__pycache__
+*.py[cod]
+*.egg-info
+.eggs
+dist
+build
+*.so
+
+# Python tooling caches
+.venv
+venv
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# uv
+uv.lock
+
+# Local dev / test outputs
+outputs
+.env
+.env.local
+
+# Docs / examples that aren't needed in the image
+docs
+examples
+*.md
+LICENSE
+CONTRIBUTING.md
+CLAUDE.md
+README.md
+
+# Tests + dev configs
+tests
+tests/__pycache__
+.pre-commit-config.yaml
+
+# Repo source — base image installs from PyPI, doesn't need local source
+src
+pyproject.toml

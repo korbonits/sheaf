@@ -118,6 +118,17 @@ server = ModalServer(models=[spec], app_name="my-sheaf", gpu="A10G")
 app = server.app  # modal deploy my_server.py
 ```
 
+**Docker:**
+
+```dockerfile
+FROM ghcr.io/korbonits/sheaf-serve:v0.9.0
+RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.9.0'
+COPY server.py .
+CMD ["python", "server.py"]
+```
+
+The base image is sheaf-serve core only; extend with the backend extras you need.  See `examples/docker/` for a worked example with a runnable `server.py`.
+
 **Typed Python client:**
 
 ```python

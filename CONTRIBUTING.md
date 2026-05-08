@@ -276,6 +276,29 @@ Tests:
 - `tests/test_client_request_id.py` — request_id propagation onto every raised exception.
 - `tests/test_openapi.py` — `generate()` schema shape and the CLI's dotted-path resolution.
 
+## Container deployment
+
+A reference base image lives at the repo root: `Dockerfile` (multi-stage,
+uv-based) installs `sheaf-serve` core into a slim Python image.  The
+official build is published to `ghcr.io/korbonits/sheaf-serve:vX.Y.Z` (and
+`:latest`) by `.github/workflows/docker.yml` on `v*` tag push, mirroring the
+PyPI publish flow.
+
+The base image deliberately has no `ENTRYPOINT` and no backend extras — it's
+foundation for derived images.  The canonical extension pattern (install
+extras + COPY a server script + set CMD) lives at `examples/docker/`,
+including a runnable `server.py` that boots Chronos-Bolt-Tiny on CPU.
+
+Build the base locally:
+
+```bash
+docker build -t sheaf-serve:dev --build-arg SHEAF_VERSION=0.9.0 .
+```
+
+CUDA variants are out of scope for the official base image — derived images
+that need GPU should swap the base for an NVIDIA CUDA runtime image and
+adapt the install steps.  See `examples/docker/README.md` for the pattern.
+
 ## LoRA adapter multiplexing
 
 Diffusion backends (`flux`, `sdxl`) opt in to LoRA via `supports_lora()` returning `True`.  Declare the adapter registry on the spec, and select per request:
