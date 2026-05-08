@@ -50,7 +50,14 @@ ARG SHEAF_VERSION
 # pre-installed.
 ARG SHEAF_EXTRAS=""
 
-RUN uv venv /app/.venv
+# --seed installs pip + setuptools into the venv.  Without it, the venv has
+# no pip binary, so `pip install` in a derived user image falls through PATH
+# to the system pip at /usr/local/bin/pip — which installs into
+# /usr/local/lib/python3.11/site-packages instead of /app/.venv/.../site-
+# packages.  The runtime Python (resolving through /app/.venv/bin/python)
+# then can't find anything the user installed.  --seed costs ~10 MB and
+# eliminates that whole class of derived-image breakage.
+RUN uv venv --seed /app/.venv
 
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"
