@@ -481,6 +481,58 @@ class _SheafDeployment:
         return [slot[i] for i in range(len(requests))]
 
 
+def build_app(spec: ModelSpec) -> Any:
+    """Return a Ray Serve ``Application`` for *spec*.
+
+    The application is the result of ``_SheafDeployment.options(...).bind(spec)``
+    — what Ray Serve consumes as a deployable unit.  ``ModelServer.run()`` calls
+    this internally; expose it as a public API so external orchestrators
+    (KubeRay's ``RayService`` ``serveConfigV2.applications[].import_path`` is
+    the canonical case) can construct the same application without going
+    through ``ModelServer``.
+
+    Example use as a KubeRay ``import_path`` target::
+
+        # examples/k8s/app.py
+        from sheaf import build_app
+        from sheaf.spec import ModelSpec, ResourceConfig
+        from sheaf.api.base import ModelType
+
+        spec = ModelSpec(name="chronos", model_type=ModelType.TIME_SERIES, ...)
+        app = build_app(spec)
+
+    Then in the ``RayService`` manifest::
+
+        serveConfigV2: |
+          applications:
+            - name: chronos
+              import_path: app:app
+              route_prefix: /chronos
+
+    Args:
+        spec: The :class:`ModelSpec` describing the deployment to build.
+            Resource config (``num_cpus`` / ``num_gpus`` / ``replicas``) is
+            applied via ``options()`` exactly as ``ModelServer._deploy`` does.
+
+    Returns:
+        A bound Ray Serve application object.  Pass it to ``serve.run(...)``
+        directly, or reference it via ``import_path`` from a KubeRay
+        ``RayService`` ``serveConfigV2``.
+    """
+    return (
+        cast(Any, _SheafDeployment)
+        .options(
+            name=spec.name,
+            num_replicas=spec.resources.replicas,
+            ray_actor_options={
+                "num_cpus": spec.resources.num_cpus,
+                "num_gpus": spec.resources.num_gpus,
+            },
+        )
+        .bind(spec)
+    )
+
+
 class ModelServer:
     """Top-level serving orchestrator.
 
@@ -507,18 +559,7 @@ class ModelServer:
 
     def _deploy(self, spec: ModelSpec) -> Any:
         """Build and deploy a _SheafDeployment for spec. Returns the handle."""
-        deployment = (
-            cast(Any, _SheafDeployment)
-            .options(
-                name=spec.name,
-                num_replicas=spec.resources.replicas,
-                ray_actor_options={
-                    "num_cpus": spec.resources.num_cpus,
-                    "num_gpus": spec.resources.num_gpus,
-                },
-            )
-            .bind(spec)
-        )
+        deployment = build_app(spec)
         return serve.run(deployment, name=spec.name, route_prefix=f"/{spec.name}")
 
     def run(self) -> None:

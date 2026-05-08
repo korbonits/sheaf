@@ -1,0 +1,100 @@
+# KubeRay RayService — sheaf-serve on Kubernetes.
+#
+# Prereqs:
+#   1. A Kubernetes cluster (Minikube / Kind for local; EKS / GKE / AKS for prod).
+#   2. KubeRay operator installed:
+#         helm repo add kuberay https://ray-project.github.io/kuberay-helm/
+#         helm install kuberay-operator kuberay/kuberay-operator --version 1.2.2
+#   3. The container image from examples/k8s/Dockerfile pushed to a registry
+#      your cluster can pull from.  Update `image:` below to match.
+#
+# Apply:
+#   kubectl apply -f examples/k8s/rayservice.yaml
+#
+# Wait for ready (~2 min on a fresh cluster while the head pulls the image
+# and Ray Serve deploys the Application):
+#   kubectl get rayservice sheaf-chronos -w
+#
+# Test:
+#   kubectl port-forward svc/sheaf-chronos-serve-svc 8000:8000
+#   curl -s http://localhost:8000/chronos/health
+#   curl -s -X POST http://localhost:8000/chronos/predict \
+#       -H 'Content-Type: application/json' \
+#       -d '{
+#             "model_type": "time_series",
+#             "model_name": "chronos",
+#             "history": [1.0, 2.0, 3.0, 4.0, 5.0],
+#             "horizon": 3,
+#             "frequency": "1h"
+#           }' | jq .
+
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: sheaf-chronos
+spec:
+  # serveConfigV2 is a Ray Serve YAML config (Ray 2.6+).  applications[].
+  # import_path references the `app` attribute in /workspace/app.py — that's
+  # the Ray Serve Application returned by sheaf.build_app(spec).
+  serveConfigV2: |
+    applications:
+      - name: chronos
+        import_path: app:app
+        route_prefix: /chronos
+
+  rayClusterConfig:
+    rayVersion: '2.10.0'
+
+    # Single head pod is enough for a CPU chronos-bolt-tiny demo.  Add a
+    # workerGroupSpecs entry below to scale out (and to host actors that
+    # don't fit on the head node).
+    headGroupSpec:
+      rayStartParams:
+        # Bind the dashboard so kubectl port-forward 8265 works.
+        dashboard-host: '0.0.0.0'
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              # Replace with the registry path you pushed examples/k8s/Dockerfile to.
+              image: YOUR_REGISTRY/sheaf-chronos:v0.9.0
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 6379
+                  name: gcs
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+                - containerPort: 8000
+                  name: serve
+              resources:
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+                requests:
+                  cpu: "1"
+                  memory: "2Gi"
+
+    # Uncomment to add a CPU worker group.  For GPU workloads (FLUX, SDXL,
+    # GraphCast), use a node selector + GPU resource request and a CUDA-
+    # based image instead of the official CPU base.
+    #
+    # workerGroupSpecs:
+    #   - replicas: 1
+    #     minReplicas: 1
+    #     maxReplicas: 3
+    #     groupName: cpu-worker
+    #     rayStartParams: {}
+    #     template:
+    #       spec:
+    #         containers:
+    #           - name: ray-worker
+    #             image: YOUR_REGISTRY/sheaf-chronos:v0.9.0
+    #             resources:
+    #               limits:
+    #                 cpu: "2"
+    #                 memory: "4Gi"
+    #               requests:
+    #                 cpu: "1"
+    #                 memory: "2Gi"

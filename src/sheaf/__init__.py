@@ -7,14 +7,19 @@ from sheaf.modal_server import ModalServer
 from sheaf.spec import ModelSpec
 
 __version__ = "0.9.0"
-__all__ = ["ModalServer", "ModelServer", "ModelSpec"]
+__all__ = ["ModalServer", "ModelServer", "ModelSpec", "build_app"]
 
 
 def __getattr__(name: str) -> object:
-    # Lazy import of ModelServer so that containers without ray installed
-    # (e.g. Modal containers with a minimal image) can still use ModalServer.
+    # Lazy imports of ModelServer / build_app so that containers without ray
+    # installed (e.g. Modal containers with a minimal image) can still use
+    # ModalServer.  Both live in sheaf.server which has heavy ray imports.
     if name == "ModelServer":
         from sheaf.server import ModelServer  # noqa: PLC0415
 
         return ModelServer
+    if name == "build_app":
+        from sheaf.server import build_app  # noqa: PLC0415
+
+        return build_app
     raise AttributeError(f"module 'sheaf' has no attribute {name!r}")

@@ -129,6 +129,18 @@ CMD ["python", "server.py"]
 
 The base image is sheaf-serve core only; extend with the backend extras you need.  See `examples/docker/` for a worked example with a runnable `server.py`.
 
+**Kubernetes (KubeRay):**
+
+`examples/k8s/` ships a `RayService` manifest that deploys the same `ModelSpec` shape via the KubeRay operator.  `sheaf.build_app(spec)` returns the Ray Serve Application directly, so it slots into KubeRay's `serveConfigV2.applications[].import_path`:
+
+```python
+# app.py — referenced by the manifest as `import_path: app:app`
+from sheaf import build_app
+from sheaf.spec import ModelSpec
+spec = ModelSpec(name="chronos", ...)
+app = build_app(spec)
+```
+
 **Typed Python client:**
 
 ```python

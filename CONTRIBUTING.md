@@ -299,6 +299,30 @@ CUDA variants are out of scope for the official base image — derived images
 that need GPU should swap the base for an NVIDIA CUDA runtime image and
 adapt the install steps.  See `examples/docker/README.md` for the pattern.
 
+## Kubernetes (KubeRay)
+
+`examples/k8s/` deploys a `ModelSpec` to a Kubernetes cluster via the
+KubeRay operator's `RayService` resource — the canonical Ray-on-K8s shape.
+The pattern hinges on `sheaf.build_app(spec)`, which returns the same Ray
+Serve Application that `ModelServer.run()` deploys internally.  KubeRay's
+`serveConfigV2.applications[].import_path: "app:app"` references this
+attribute.
+
+`build_app` is a thin wrapper over `_SheafDeployment.options(...).bind(spec)`
+— the same private path `ModelServer._deploy` uses internally.  External
+orchestrators (KubeRay is the canonical case) get a stable public API
+without depending on `_SheafDeployment`'s implementation details.
+
+The example layout:
+
+- `examples/k8s/app.py` — the importable Ray Serve Application.
+- `examples/k8s/Dockerfile` — extends the official base image and bakes
+  `app.py` in at `/workspace`.
+- `examples/k8s/rayservice.yaml` — the `RayService` manifest, with
+  `image:` placeholder for the user's registry.
+- `examples/k8s/README.md` — prereqs (Minikube / Kind / EKS / GKE / AKS,
+  KubeRay operator), build + push, `kubectl apply`, port-forward smoke test.
+
 ## LoRA adapter multiplexing
 
 Diffusion backends (`flux`, `sdxl`) opt in to LoRA via `supports_lora()` returning `True`.  Declare the adapter registry on the spec, and select per request:

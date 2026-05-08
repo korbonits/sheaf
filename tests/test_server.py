@@ -281,3 +281,38 @@ def test_update_raises_for_unknown_deployment() -> None:
     )
     with pytest.raises(ValueError, match="does-not-exist"):
         server.update(spec)
+
+
+# ---------------------------------------------------------------------------
+# build_app — public API for KubeRay / external orchestrators
+# ---------------------------------------------------------------------------
+
+
+def test_build_app_returns_application() -> None:
+    """build_app(spec) must return a Ray Serve Application without needing
+    a running Ray cluster.  KubeRay's RayService import_path resolution
+    only imports the module and reads the attribute, so .bind() must work
+    in isolation."""
+    from sheaf.api.base import ModelType
+    from sheaf.server import build_app
+    from sheaf.spec import ModelSpec, ResourceConfig
+
+    spec = ModelSpec(
+        name="test-app",
+        model_type=ModelType.TIME_SERIES,
+        backend="_smoke_ts",
+        backend_cls=_StubTimeSeriesBackend,
+        resources=ResourceConfig(num_cpus=0.5, num_gpus=0.0, replicas=2),
+    )
+    app = build_app(spec)
+    assert app is not None
+    # The bound application should be a Ray Serve graph node, not a class.
+    assert not isinstance(app, type)
+
+
+def test_build_app_top_level_export() -> None:
+    """sheaf.build_app should re-export from sheaf.server.build_app."""
+    import sheaf
+    from sheaf.server import build_app as server_build_app
+
+    assert sheaf.build_app is server_build_app
