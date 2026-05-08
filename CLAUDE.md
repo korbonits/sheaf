@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.9.0 shipped (typed Python client `sheaf.client` with retry config, request_id propagation, OpenAPI export)
+## Current state: v0.10.0 shipped (Docker base image at `ghcr.io/korbonits/sheaf-serve` + KubeRay `RayService` example + `sheaf.build_app(spec)` public API)
 
 Per-version ship notes live in git history and release tags. This doc tracks what exists *now* and the non-obvious design choices behind it. For feature-level changelog, see `git log`.
 

@@ -57,7 +57,7 @@ spec:
           containers:
             - name: ray-head
               # Replace with the registry path you pushed examples/k8s/Dockerfile to.
-              image: YOUR_REGISTRY/sheaf-chronos:v0.9.0
+              image: YOUR_REGISTRY/sheaf-chronos:v0.10.0
               imagePullPolicy: IfNotPresent
               ports:
                 - containerPort: 6379
@@ -90,7 +90,7 @@ spec:
     #       spec:
     #         containers:
     #           - name: ray-worker
-    #             image: YOUR_REGISTRY/sheaf-chronos:v0.9.0
+    #             image: YOUR_REGISTRY/sheaf-chronos:v0.10.0
     #             resources:
     #               limits:
     #                 cpu: "2"

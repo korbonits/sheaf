@@ -26,16 +26,17 @@
 
 # Pin to a specific sheaf-serve release.  Bump intentionally; don't track
 # `:latest` in production.
-FROM ghcr.io/korbonits/sheaf-serve:v0.9.0
+FROM ghcr.io/korbonits/sheaf-serve:v0.10.0
 
 # Add the backend extras your deployment actually needs.  Multiple extras
 # in a single bracket expression keep the install in one resolver pass.
-RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.9.0'
+RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.10.0'
 
 # Copy the server script that calls ModelServer.run().  /workspace is the
 # image's WORKDIR, so this lands at /workspace/server.py.
 COPY server.py .
 
-# Run inside the venv that the base image set on PATH.  Binds 0.0.0.0
-# inside the container so the published port (-p 8000:8000) reaches it.
+# Run with the system Python the base image installed sheaf-serve into.
+# Binds 0.0.0.0 inside the container so the published port (-p 8000:8000)
+# reaches it.
 CMD ["python", "server.py"]

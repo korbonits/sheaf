@@ -121,8 +121,8 @@ app = server.app  # modal deploy my_server.py
 **Docker:**
 
 ```dockerfile
-FROM ghcr.io/korbonits/sheaf-serve:v0.9.0
-RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.9.0'
+FROM ghcr.io/korbonits/sheaf-serve:v0.10.0
+RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.10.0'
 COPY server.py .
 CMD ["python", "server.py"]
 ```

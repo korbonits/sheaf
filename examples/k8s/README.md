@@ -36,8 +36,8 @@ Application running.
 
 ```bash
 cd examples/k8s
-docker build -t YOUR_REGISTRY/sheaf-chronos:v0.9.0 .
-docker push YOUR_REGISTRY/sheaf-chronos:v0.9.0
+docker build -t YOUR_REGISTRY/sheaf-chronos:v0.10.0 .
+docker push YOUR_REGISTRY/sheaf-chronos:v0.10.0
 ```
 
 The Dockerfile uses `COPY app.py .`, so the build context must be a
@@ -47,7 +47,7 @@ directory that has `app.py` at the root.  In production, copy this
 
 ### 2. Update the manifest
 
-In `rayservice.yaml`, replace `YOUR_REGISTRY/sheaf-chronos:v0.9.0` with
+In `rayservice.yaml`, replace `YOUR_REGISTRY/sheaf-chronos:v0.10.0` with
 the path you just pushed.
 
 ### 3. Apply
