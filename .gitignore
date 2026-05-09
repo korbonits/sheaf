@@ -11,5 +11,6 @@ venv/
 .pytest_cache/
 *.so
 .env
-# mkdocs build output
+# mkdocs build output (local: site/, netlify build: _site/)
 site/
+_site/

@@ -1,0 +1,28 @@
+# Netlify build config for the docs site at sheaf-serve.dev.
+#
+# Connect: github.com/korbonits/sheaf → Netlify → "Add new site" → "Import
+# from Git".  Netlify reads this file; no other dashboard setup needed
+# beyond setting the custom domain.
+
+[build]
+  base = "."
+  command = "pip install --upgrade uv && uv sync --extra docs && uv run mkdocs build --site-dir _site"
+  publish = "_site"
+
+[build.environment]
+  # mkdocstrings + griffe parse the Python source; pin to the version
+  # the project supports (3.11 is the lower bound — same as CI).
+  PYTHON_VERSION = "3.11"
+
+# Sensible cache headers for a docs site.  Versioned assets (mkdocs-
+# material's hashed CSS/JS) can be cached forever; HTML pages should
+# revalidate so deploys propagate within a refresh.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

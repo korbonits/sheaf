@@ -1,38 +1,33 @@
-name: Build and deploy docs to GitHub Pages
+name: Docs build check
 
+# Netlify owns the actual deploy of sheaf-serve.dev (build config in
+# netlify.toml at repo root).  This workflow only runs `mkdocs build`
+# as a PR-time gate so broken refs / mkdocstrings errors / missing
+# pages fail CI before merge — Netlify's deploy preview is the
+# rendered-site check, this is the build-doesn't-error check.
+#
 # Triggers:
-#   - push to main: full build + deploy to gh-pages → sheaf-serve.dev
-#   - pull_request that touches docs/, mkdocs.yml, or this workflow:
-#       build-only validation; catches broken refs / mkdocstrings errors at
-#       PR time instead of after merge.
-#   - workflow_dispatch: manual fire from the UI for a re-deploy without
-#       a code change.
+#   - pull_request that touches docs/, mkdocs.yml, src/, or pyproject.toml
+#   - workflow_dispatch for manual fire
+#   - push to main: sanity check that whatever just merged still builds
 on:
   push:
     branches: [main]
     paths:
       - "docs/**"
       - "mkdocs.yml"
-      - "src/**"  # mkdocstrings imports src/sheaf, so source changes can change the rendered API ref
+      - "src/**"
       - ".github/workflows/docs.yml"
       - "pyproject.toml"
   pull_request:
     paths:
       - "docs/**"
       - "mkdocs.yml"
+      - "src/**"
       - ".github/workflows/docs.yml"
       - "pyproject.toml"
+      - "netlify.toml"
   workflow_dispatch:
-
-# Required by peaceiris/actions-gh-pages to push to gh-pages.
-permissions:
-  contents: write
-
-# Avoid clobbering a deploy with a queued one — only the latest push to main
-# wins.
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -47,10 +42,6 @@ jobs:
       - name: Install uv
         run: pip install uv
 
-      # mkdocstrings needs the package importable to render the API ref.
-      # The [docs] extra installs mkdocs + mkdocs-material + mkdocstrings;
-      # syncing without any model extras keeps the build fast — the API ref
-      # for the contract types lives in sheaf.api.* which is core, not extras.
       - name: Install
         run: uv sync --extra docs
 
@@ -64,32 +55,3 @@ jobs:
         # cleanup: convert Args: → Attributes: across sheaf.api.*
         # before re-enabling strict mode.
         run: uv run mkdocs build
-
-      - name: Upload site artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: site
-          path: site
-
-  deploy:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: site
-          path: site
-
-      - name: Deploy to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          # Custom domain.  docs/CNAME is copied into the build, so the
-          # gh-pages branch ends up with a CNAME file at root that GitHub
-          # Pages reads on each deploy.
-          cname: sheaf-serve.dev
