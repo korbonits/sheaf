@@ -1,0 +1,22 @@
+{
+  "target_rps": 20,
+  "duration_s": 20,
+  "warmup_s": 5,
+  "url": "http://127.0.0.1:8000/predict",
+  "achieved_rps": 20.05,
+  "n_samples": 401,
+  "n_errors": 0,
+  "p50_ms": 13.224499998614192,
+  "p95_ms": 16.41304203076288,
+  "p99_ms": 29.715292039327323,
+  "mean_ms": 13.530745512563177,
+  "max_ms": 45.260374958161265,
+  "server": "bentoml",
+  "hardware": {
+    "platform": "macOS-26.3.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.12.13",
+    "cpu_model": "Apple M1",
+    "cpu_count": 8
+  }
+}
