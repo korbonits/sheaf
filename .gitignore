@@ -11,3 +11,5 @@ venv/
 .pytest_cache/
 *.so
 .env
+# mkdocs build output
+site/

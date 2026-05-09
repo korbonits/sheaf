@@ -1,0 +1,95 @@
+name: Build and deploy docs to GitHub Pages
+
+# Triggers:
+#   - push to main: full build + deploy to gh-pages → sheaf-serve.dev
+#   - pull_request that touches docs/, mkdocs.yml, or this workflow:
+#       build-only validation; catches broken refs / mkdocstrings errors at
+#       PR time instead of after merge.
+#   - workflow_dispatch: manual fire from the UI for a re-deploy without
+#       a code change.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "src/**"  # mkdocstrings imports src/sheaf, so source changes can change the rendered API ref
+      - ".github/workflows/docs.yml"
+      - "pyproject.toml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+# Required by peaceiris/actions-gh-pages to push to gh-pages.
+permissions:
+  contents: write
+
+# Avoid clobbering a deploy with a queued one — only the latest push to main
+# wins.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      # mkdocstrings needs the package importable to render the API ref.
+      # The [docs] extra installs mkdocs + mkdocs-material + mkdocstrings;
+      # syncing without any model extras keeps the build fast — the API ref
+      # for the contract types lives in sheaf.api.* which is core, not extras.
+      - name: Install
+        run: uv sync --extra docs
+
+      - name: Build
+        # Plain build (not --strict) for now: BaseModel docstrings use
+        # ``Args:`` to describe Pydantic fields, which griffe flags as
+        # signature mismatches because BaseModel's ``__init__`` accepts
+        # ``**kwargs`` rather than the listed names.  The warnings are
+        # cosmetic (the API ref still renders fields via Pydantic's
+        # schema), but ``--strict`` fails on them.  Tracked as
+        # cleanup: convert Args: → Attributes: across sheaf.api.*
+        # before re-enabling strict mode.
+        run: uv run mkdocs build
+
+      - name: Upload site artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site
+
+  deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          # Custom domain.  docs/CNAME is copied into the build, so the
+          # gh-pages branch ends up with a CNAME file at root that GitHub
+          # Pages reads on each deploy.
+          cname: sheaf-serve.dev
