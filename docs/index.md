@@ -43,6 +43,42 @@ pip install "sheaf-serve[all]"                # everything
 
 The full extras matrix is on the [Models](models/index.md) page.
 
+## Try it without installing — live demo
+
+A public sheaf-serve deployment is running `amazon/chronos-bolt-tiny` on
+Modal at:
+
+```
+https://korbonits--sheaf-demo-modalserver---init----locals---serve.modal.run
+```
+
+Hit it from anywhere. No install, no cluster, no GPU — real time-series
+forecasts come back:
+
+```bash
+URL=https://korbonits--sheaf-demo-modalserver---init----locals---serve.modal.run
+
+curl $URL/chronos/health
+# {"status":"ok"}
+
+curl -X POST $URL/chronos/predict \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "model_type": "time_series",
+        "model_name": "chronos",
+        "history": [312, 298, 275, 260, 255, 263, 285, 320, 368, 402, 421, 435],
+        "horizon": 6,
+        "frequency": "1h",
+        "output_mode": "quantiles",
+        "quantile_levels": [0.1, 0.5, 0.9]
+      }'
+```
+
+The same `ModelSpec` you'd write locally is what runs there. Source for
+the deployment is at
+[`examples/demo/app.py`](https://github.com/korbonits/sheaf/blob/main/examples/demo/app.py)
+— ~20 lines of user code, deploy with `modal deploy`.
+
 ## 30-second taste
 
 ```python

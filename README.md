@@ -19,6 +19,16 @@ Each model type gets a typed request/response contract. Batching, caching, and s
 
 ## Install
 
+> **Try it without installing** — a live deployment of `amazon/chronos-bolt-tiny` is running on Modal at:
+>
+> ```
+> https://korbonits--sheaf-demo-modalserver---init----locals---serve.modal.run
+> ```
+>
+> ```bash
+> curl https://korbonits--sheaf-demo-modalserver---init----locals---serve.modal.run/chronos/health
+> ```
+
 > **Requires Python 3.11+.** macOS's system `python3` is usually 3.10 — bootstrap a 3.11 venv first via [`uv`](https://docs.astral.sh/uv/) (`uv venv --python 3.11 .venv && source .venv/bin/activate`) or `pyenv`. The `[molecular]` extra (ESM-3) additionally requires Python 3.12+.
 
 ```bash
