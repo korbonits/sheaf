@@ -14,3 +14,5 @@ venv/
 # mkdocs build output (local: site/, netlify build: _site/)
 site/
 _site/
+# launch post drafts — personal notes, not for public repo
+launch/
