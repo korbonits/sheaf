@@ -19,6 +19,15 @@ is the substrate. [Feast](https://feast.dev) is a first-class input primitive.
 
 ## Install
 
+!!! info "Requires Python 3.11+"
+    sheaf-serve targets Python 3.11 and 3.12. macOS users on the
+    system `python3` (often 3.10) should bootstrap a 3.11 environment
+    first — the easiest way is [`uv`](https://docs.astral.sh/uv/):
+    ```bash
+    uv venv --python 3.11 .venv && source .venv/bin/activate
+    ```
+    The `[molecular]` extra (ESM-3) additionally requires Python 3.12+.
+
 ```bash
 pip install sheaf-serve                       # core
 pip install "sheaf-serve[time-series]"        # + Chronos2 / TimesFM / Moirai

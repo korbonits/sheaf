@@ -6,6 +6,18 @@ forecast in under five minutes. No GPU required; the example model is
 
 ## 1. Install
 
+!!! warning "Python 3.11 or later required"
+    Confirm your interpreter version before installing. A common gotcha
+    on macOS: the system `python3` is often 3.10, and pip will silently
+    refuse to install a current sheaf-serve on it. Bootstrap a 3.11
+    environment first — the cleanest path is
+    [`uv`](https://docs.astral.sh/uv/):
+    ```bash
+    uv venv --python 3.11 .venv
+    source .venv/bin/activate
+    python --version  # should show 3.11.x
+    ```
+
 ```bash
 pip install "sheaf-serve[time-series]"
 ```

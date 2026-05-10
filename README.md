@@ -19,6 +19,8 @@ Each model type gets a typed request/response contract. Batching, caching, and s
 
 ## Install
 
+> **Requires Python 3.11+.** macOS's system `python3` is usually 3.10 — bootstrap a 3.11 venv first via [`uv`](https://docs.astral.sh/uv/) (`uv venv --python 3.11 .venv && source .venv/bin/activate`) or `pyenv`. The `[molecular]` extra (ESM-3) additionally requires Python 3.12+.
+
 ```bash
 pip install sheaf-serve                           # core only
 pip install "sheaf-serve[time-series]"            # + Chronos2 / TimesFM / Moirai
