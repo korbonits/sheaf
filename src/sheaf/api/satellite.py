@@ -42,7 +42,7 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 class SatelliteRequest(BaseRequest):
     """Request contract for Earth observation foundation models.
 
-    Args:
+    Attributes:
         pixels_b64:    Base64 float32 pixel array of shape
                        (n_time, n_bands, height, width).
         n_time:        Number of time steps in the input stack.

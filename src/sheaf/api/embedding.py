@@ -17,7 +17,7 @@ class EmbeddingRequest(BaseRequest):
     Both fields accept a batch — pass multiple items to embed them in a single
     forward pass.
 
-    Args:
+    Attributes:
         texts: List of strings to embed (text modality).
         images_b64: List of base64-encoded image files to embed (vision modality).
             Any format PIL can open is accepted (JPEG, PNG, WebP, etc.).

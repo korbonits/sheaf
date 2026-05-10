@@ -16,7 +16,7 @@ class MaterialsRequest(BaseRequest):
     optionally in a periodic simulation cell. The model predicts the potential
     energy surface and its derivatives.
 
-    Args:
+    Attributes:
         atomic_numbers: Atomic numbers (Z) for each atom. Length N.
         positions_b64: Base64-encoded float32 array of shape (N, 3) giving
             Cartesian coordinates in Angstroms.

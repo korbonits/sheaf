@@ -16,7 +16,7 @@ class OpticalFlowRequest(BaseRequest):
     Accepts two consecutive video frames and returns the dense per-pixel
     displacement field between them.
 
-    Args:
+    Attributes:
         frame1_b64: Base64-encoded first frame (JPEG, PNG, or any PIL-readable
             format). Both frames must have the same spatial dimensions.
         frame2_b64: Base64-encoded second frame.

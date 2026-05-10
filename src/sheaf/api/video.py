@@ -22,7 +22,7 @@ class VideoRequest(BaseRequest):
     Pass exactly the number the model was pretrained on, or the processor
     will pad/truncate automatically.
 
-    Args:
+    Attributes:
         frames_b64: Ordered list of base64-encoded video frames.
         task: "embedding" returns a single fixed-size vector per video clip;
             "classification" returns class labels and softmax scores.

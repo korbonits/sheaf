@@ -37,7 +37,7 @@ class AudioRequest(BaseRequest):
     Audio is passed as base64-encoded bytes. Any format that ffmpeg can
     decode is accepted (wav, mp3, m4a, ogg, flac, etc.).
 
-    Args:
+    Attributes:
         audio_b64: Base64-encoded audio file bytes.
         language: BCP-47 language code (e.g. "en", "fr") or None for
             auto-detection. English-only model variants (e.g. "tiny.en")
@@ -101,7 +101,7 @@ class AudioResponse(BaseResponse):
 class TTSRequest(BaseRequest):
     """Request contract for text-to-speech synthesis.
 
-    Args:
+    Attributes:
         text: Input text to synthesize.
         voice_preset: Optional speaker voice preset. Bark: "v2/en_speaker_6" etc.
             Kokoro: "af_heart", "af_bella", "am_adam", "bf_emma", "bm_george", etc.

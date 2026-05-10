@@ -14,7 +14,7 @@ class MolecularRequest(BaseRequest):
     use standard single-letter amino acid codes (ACDEFGHIKLMNPQRSTVWY plus
     ambiguity codes accepted by ESM tokenizers).
 
-    Args:
+    Attributes:
         sequences: List of amino acid sequences to embed.
         pooling: How to reduce the per-residue hidden states to a single
             vector per sequence.

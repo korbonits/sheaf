@@ -13,7 +13,7 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 class DetectionRequest(BaseRequest):
     """Request contract for object detection.
 
-    Args:
+    Attributes:
         image_b64: Base64-encoded image file.  Any format PIL can open is
             accepted (JPEG, PNG, WebP, etc.).
         threshold: Minimum confidence score for a detection to be included

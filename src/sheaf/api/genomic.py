@@ -14,7 +14,7 @@ class GenomicRequest(BaseRequest):
     use standard nucleotide codes (A, C, G, T for DNA; A, C, G, U for RNA;
     N for unknown bases). All are accepted by Nucleotide Transformer tokenizers.
 
-    Args:
+    Attributes:
         sequences: List of nucleotide sequences to embed.
         pooling: How to reduce per-token hidden states to a single vector.
             ``"mean"`` (default) — mean of non-special tokens (excludes CLS

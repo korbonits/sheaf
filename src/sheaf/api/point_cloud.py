@@ -18,7 +18,7 @@ class PointCloudRequest(BaseRequest):
     pre-normalised to a unit sphere centred at the origin (subtract centroid,
     divide by max radius).
 
-    Args:
+    Attributes:
         points_b64: Base64-encoded flat float32 byte array, shape ``(n_points, 3)``.
             Decode with::
 

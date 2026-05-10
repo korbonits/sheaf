@@ -17,7 +17,7 @@ class PoseRequest(BaseRequest):
     If ``bboxes`` is provided, each box is used as a person crop. If omitted,
     the full image is treated as a single-person crop.
 
-    Args:
+    Attributes:
         image_b64: Base64-encoded image (JPEG, PNG, or any PIL-readable format).
         bboxes: Optional list of person bounding boxes in pixel coordinates,
             each ``[x_min, y_min, x_max, y_max]``. If None, defaults to the

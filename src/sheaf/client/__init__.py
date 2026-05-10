@@ -404,13 +404,14 @@ class SheafClient:
             The decoded response, as the correct Pydantic class for the
             request's model type.
 
+        Every raised exception carries ``e.request_id`` set to
+        ``request.request_id`` so the caller can correlate to server logs.
+
         Raises:
             ValidationError: 422 from server.
             ServerError:     5xx from server.
             SheafError:      Other non-2xx status codes.
             ClientError:     Transport / JSON decode failures.
-
-            All carry ``e.request_id`` set to ``request.request_id``.
         """
         rid = request.request_id
         payload = _request_payload(request)

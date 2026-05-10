@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field, model_validator
 class LoRAAdapter(BaseModel):
     """A single named LoRA adapter declared on a ``ModelSpec``.
 
-    Args:
+    Attributes:
         source: Local path or ``hf:org/repo[:weight_file]`` reference.
         weight: Default weight applied when this adapter is selected without
             an explicit ``adapter_weights`` override on the request.  Must be
@@ -51,7 +51,7 @@ class LoRAAdapter(BaseModel):
 class LoRAConfig(BaseModel):
     """Adapter registry for a single deployment.
 
-    Args:
+    Attributes:
         adapters: Mapping of adapter name → :class:`LoRAAdapter`.  Names are
             the user-facing identifiers used in ``request.adapters``.
         default: Optional name from ``adapters`` to apply when the request

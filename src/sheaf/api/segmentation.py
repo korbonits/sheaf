@@ -17,7 +17,7 @@ class SegmentationRequest(BaseRequest):
     provided — either ``point_coords`` (with matching ``point_labels``) or
     ``box``, or both.
 
-    Args:
+    Attributes:
         image_b64: Base64-encoded image file.  Any format PIL can open is
             accepted (JPEG, PNG, WebP, etc.).
         point_coords: List of [x, y] points (pixel coordinates).

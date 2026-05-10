@@ -35,7 +35,7 @@ class MultimodalEmbeddingRequest(BaseRequest):
     (JPEG/PNG for vision; WAV/MP3 for audio).  The backend writes temporary
     files as needed — the model loaders read paths, not raw bytes.
 
-    Args:
+    Attributes:
         normalize: If True (default), L2-normalize output embeddings so that
             cosine similarity equals dot product.
     """

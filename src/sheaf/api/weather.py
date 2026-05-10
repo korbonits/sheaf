@@ -38,7 +38,7 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 class WeatherRequest(BaseRequest):
     """Request contract for atmospheric-state foundation models.
 
-    Args:
+    Attributes:
         surface_vars:        Surface variable fields at time t.
                              Keys are variable names (ERA5-style for GraphCast,
                              e.g. "2m_temperature", "10m_u_component_of_wind").

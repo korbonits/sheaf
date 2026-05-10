@@ -14,7 +14,7 @@ class SmallMoleculeRequest(BaseRequest):
     strings. SMILES (Simplified Molecular-Input Line-Entry System) is the
     standard text representation of molecular structure.
 
-    Args:
+    Attributes:
         smiles: List of SMILES strings to embed. Each string represents one
             molecule (e.g. "CC(=O)OC1=CC=CC=C1C(=O)O" for aspirin).
         pooling: How to reduce per-token hidden states to a fixed-size vector.

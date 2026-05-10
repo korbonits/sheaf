@@ -12,7 +12,7 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 class DiffusionRequest(BaseRequest):
     """Request contract for text-to-image diffusion models.
 
-    Args:
+    Attributes:
         prompt: Text description of the image to generate.
         negative_prompt: Text description of what to avoid.  Not supported
             by all models (FLUX.1-schnell ignores it).
@@ -79,7 +79,7 @@ class DiffusionResponse(BaseResponse):
 
         img = Image.open(io.BytesIO(base64.b64decode(image_b64)))
 
-    Args:
+    Attributes:
         image_b64: Base64-encoded PNG image.
         height: Output image height in pixels.
         width: Output image width in pixels.

@@ -13,7 +13,7 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 class DepthRequest(BaseRequest):
     """Request contract for monocular depth estimation.
 
-    Args:
+    Attributes:
         image_b64: Base64-encoded image file.  Any format PIL can open is
             accepted (JPEG, PNG, WebP, etc.).
         normalize: If True (default), the depth map is linearly rescaled to

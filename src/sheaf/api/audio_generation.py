@@ -10,7 +10,7 @@ from sheaf.api.base import BaseRequest, BaseResponse, ModelType
 class AudioGenerationRequest(BaseRequest):
     """Request contract for text-conditioned audio/music generation.
 
-    Args:
+    Attributes:
         prompt: Text description of the audio to generate
             (e.g. "happy jazz with piano and drums").
         duration_s: Target duration in seconds. Converted to

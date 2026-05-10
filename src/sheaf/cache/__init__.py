@@ -46,7 +46,7 @@ _DISABLED = bool(os.environ.get("SHEAF_CACHE_DISABLED"))
 class CacheConfig(BaseModel):
     """Cache configuration for a single deployment.
 
-    Args:
+    Attributes:
         enabled:        Enable the cache (default ``False`` — opt-in).
         max_size:       Maximum number of LRU entries (default 1024).
         ttl_s:          Time-to-live in seconds.  ``None`` (default) means

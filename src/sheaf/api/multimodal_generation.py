@@ -17,7 +17,7 @@ class MultimodalGenerationRequest(BaseRequest):
     conditions the generation.  When ``mask_b64`` is omitted the backend runs
     img2img (style/content transfer); when provided it runs inpainting.
 
-    Args:
+    Attributes:
         prompt: Text description guiding the generated image.
         image_b64: Base64-encoded input image (JPEG, PNG, or any PIL-readable
             format).  Acts as the conditioning source for img2img / inpainting.

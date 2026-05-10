@@ -14,7 +14,7 @@ class TabularRequest(BaseRequest):
     examples passed at inference time. query_X contains the rows to predict.
     No separate training step — everything happens in a single forward pass.
 
-    Args:
+    Attributes:
         context_X: Feature matrix for in-context examples, shape [n_context, n_features]
         context_y: Labels for in-context examples, shape [n_context]
         query_X: Feature rows to predict, shape [n_query, n_features]

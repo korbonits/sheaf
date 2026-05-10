@@ -45,13 +45,12 @@ jobs:
       - name: Install
         run: uv sync --extra docs
 
-      - name: Build
-        # Plain build (not --strict) for now: BaseModel docstrings use
-        # ``Args:`` to describe Pydantic fields, which griffe flags as
-        # signature mismatches because BaseModel's ``__init__`` accepts
-        # ``**kwargs`` rather than the listed names.  The warnings are
-        # cosmetic (the API ref still renders fields via Pydantic's
-        # schema), but ``--strict`` fails on them.  Tracked as
-        # cleanup: convert Args: → Attributes: across sheaf.api.*
-        # before re-enabling strict mode.
-        run: uv run mkdocs build
+      - name: Build (strict)
+        # --strict turns mkdocstrings warnings (broken refs, malformed
+        # docstring sections, missing modules) into errors so we catch
+        # documentation drift on PR rather than after merge.  Re-enabled
+        # after the Args: → Attributes: cleanup across sheaf.api.* +
+        # sheaf.cache + sheaf.lora + sheaf.client (Pydantic BaseModel
+        # docstrings can't use Args: because BaseModel.__init__ takes
+        # **kwargs, and griffe correctly flags the signature mismatch).
+        run: uv run mkdocs build --strict
