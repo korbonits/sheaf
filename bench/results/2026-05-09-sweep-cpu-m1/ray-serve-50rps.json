@@ -1,0 +1,22 @@
+{
+  "target_rps": 50,
+  "duration_s": 20,
+  "warmup_s": 5,
+  "url": "http://127.0.0.1:8000/forecaster/predict",
+  "achieved_rps": 50.05,
+  "n_samples": 1001,
+  "n_errors": 0,
+  "p50_ms": 32.71412500180304,
+  "p95_ms": 43.33162499824539,
+  "p99_ms": 73.16420797724277,
+  "mean_ms": 33.852555381134614,
+  "max_ms": 113.41333296149969,
+  "server": "ray-serve",
+  "hardware": {
+    "platform": "macOS-26.3.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.12.13",
+    "cpu_model": "Apple M1",
+    "cpu_count": 8
+  }
+}

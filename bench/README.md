@@ -88,12 +88,19 @@ Each results file in [`results/`](./results/) records the hardware it was
 run on (CPU model, core count, RAM, OS). Numbers are not portable across
 machines — re-run the bench on your own to know what to expect on yours.
 
-Latest run: [`results/2026-05-09-cpu-m1.md`](./results/2026-05-09-cpu-m1.md)
-— Apple M1, 20 RPS, 20 s window. tl;dr: sheaf-serve is at parity with
-raw Ray Serve (the same substrate); BentoML is faster than both at low
-RPS because Ray Serve's multi-actor hop overhead dominates when most
-batches contain one request. The framework-vs-no-framework SLOC delta
-favours sheaf by ~60%.
+Runs to date:
+
+- [`results/2026-05-09-sweep-cpu-m1.md`](./results/2026-05-09-sweep-cpu-m1.md)
+  — Apple M1, sweep at 10 / 50 / 100 RPS. Sheaf at parity with raw
+  Ray Serve at every sustainable RPS (typed-contract overhead is
+  free); both Ray-Serve-based servers saturate at 100 RPS on a
+  single CPU replica; BentoML's p50 drops as RPS climbs (batching
+  amortisation actually working) and survives at 100 RPS with ~1%
+  errors. The benchmark does not pick a winner; it picks the right
+  tool per workload.
+- [`results/2026-05-09-cpu-m1.md`](./results/2026-05-09-cpu-m1.md)
+  — Apple M1, 20 RPS, single-point run. SLOC table is here:
+  sheaf 36 vs raw Ray Serve 58 vs BentoML 57.
 
 ## What the results tell you
 

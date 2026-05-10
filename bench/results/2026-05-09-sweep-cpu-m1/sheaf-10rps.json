@@ -1,0 +1,22 @@
+{
+  "target_rps": 10,
+  "duration_s": 20,
+  "warmup_s": 5,
+  "url": "http://127.0.0.1:8000/forecaster/predict",
+  "achieved_rps": 10.05,
+  "n_samples": 201,
+  "n_errors": 0,
+  "p50_ms": 30.93354101292789,
+  "p95_ms": 48.201958008576185,
+  "p99_ms": 70.69325004704297,
+  "mean_ms": 33.56254993983086,
+  "max_ms": 95.2354579931125,
+  "server": "sheaf",
+  "hardware": {
+    "platform": "macOS-26.3.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.12.13",
+    "cpu_model": "Apple M1",
+    "cpu_count": 8
+  }
+}
