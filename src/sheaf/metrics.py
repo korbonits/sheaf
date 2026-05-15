@@ -52,7 +52,14 @@ def _get_registry() -> Any:
     return _registry
 
 
-# Metric singletons — populated on first call to _counters()
+# Metric singletons — populated on first call to _counters().
+# Also holds the pre-resolved labelled-children sub-caches (keys prefixed
+# with underscore) so clearing _counters_cache between tests drops them
+# too.  Pre-resolving avoids the per-call `.labels()` lookup, which
+# acquires a lock on the metric's internal child dict in prometheus_client
+# and becomes a contention hot spot under high RPS.  See
+# bench/results/2026-05-14-sweep-cpu-m5.md for the saturation case that
+# motivated this cache.
 _counters_cache: dict[str, Any] = {}
 
 
@@ -97,6 +104,10 @@ def _counters() -> dict[str, Any] | None:
         ["deployment", "model_type"],
         registry=reg,
     )
+    # Pre-resolved labelled children, keyed by the label tuple per metric.
+    _counters_cache["_predict_children"] = {}
+    _counters_cache["_batch_children"] = {}
+    _counters_cache["_load_children"] = {}
     return _counters_cache
 
 
@@ -122,12 +133,21 @@ def record_predict(
     m = _counters()
     if m is None:
         return
-    m["requests_total"].labels(
-        deployment=deployment, model_type=model_type, status=status
-    ).inc()
-    m["request_duration"].labels(deployment=deployment, model_type=model_type).observe(
-        latency_s
-    )
+    cache = m["_predict_children"]
+    key = (deployment, model_type, status)
+    children = cache.get(key)
+    if children is None:
+        children = (
+            m["requests_total"].labels(
+                deployment=deployment, model_type=model_type, status=status
+            ),
+            m["request_duration"].labels(
+                deployment=deployment, model_type=model_type
+            ),
+        )
+        cache[key] = children
+    children[0].inc()
+    children[1].observe(latency_s)
 
 
 def record_batch(deployment: str, batch_size: int) -> None:
@@ -140,7 +160,12 @@ def record_batch(deployment: str, batch_size: int) -> None:
     m = _counters()
     if m is None:
         return
-    m["batch_size"].labels(deployment=deployment).observe(batch_size)
+    cache = m["_batch_children"]
+    child = cache.get(deployment)
+    if child is None:
+        child = m["batch_size"].labels(deployment=deployment)
+        cache[deployment] = child
+    child.observe(batch_size)
 
 
 def record_load(deployment: str, model_type: str, load_time_s: float) -> None:
@@ -154,9 +179,15 @@ def record_load(deployment: str, model_type: str, load_time_s: float) -> None:
     m = _counters()
     if m is None:
         return
-    m["backend_load_seconds"].labels(deployment=deployment, model_type=model_type).set(
-        load_time_s
-    )
+    cache = m["_load_children"]
+    key = (deployment, model_type)
+    child = cache.get(key)
+    if child is None:
+        child = m["backend_load_seconds"].labels(
+            deployment=deployment, model_type=model_type
+        )
+        cache[key] = child
+    child.set(load_time_s)
 
 
 def time_load(deployment: str, model_type: str) -> Any:
