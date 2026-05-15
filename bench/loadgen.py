@@ -21,9 +21,19 @@ Honest measurement notes:
 - p99 with N samples requires N >= 100 to be meaningful, N >= 1000 to be
   trustworthy.  At target_rps=50 with duration=30s that's 1500 samples,
   comfortable.
-- The achieved RPS field reports what we actually sent; if the server is
-  saturated and rejecting connections the reported RPS will be lower
-  than the target — note that and don't lie about it.
+- The achieved RPS field is ``n_successful_responses / nominal_duration``
+  where the numerator counts responses received during the measurement
+  window — *including* any that complete during the post-firing drain
+  (``asyncio.gather`` at the end of ``_run``).  At sustainable load this
+  equals real-time throughput.  At saturation it diverges: the firing
+  loop still emits at the target rate, requests queue, and the loadgen
+  blocks on ``gather`` until the backlog clears, so the count of
+  eventually-successful responses can approach the target even when
+  steady-state service rate was much lower.  Read p50 alongside this
+  number — if p50 is in the seconds, the server saturated; the
+  ``achieved_rps`` is then better thought of as a *completion ratio*
+  expressed in the same units as the input rate, not a throughput
+  measurement.
 """
 
 from __future__ import annotations
