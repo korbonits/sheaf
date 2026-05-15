@@ -90,6 +90,15 @@ machines — re-run the bench on your own to know what to expect on yours.
 
 Runs to date:
 
+- [`results/2026-05-14-sweep-cpu-m5.md`](./results/2026-05-14-sweep-cpu-m5.md)
+  — Apple M5, sweep at 10 / 50 / 100 RPS. M5 capacity moves the
+  inflection points higher: raw Ray Serve and BentoML now sustain
+  100 RPS without saturating. New finding the M1 sweep couldn't
+  show — at 100 RPS sheaf saturates while its substrate
+  (raw Ray Serve) does not. Honest regression to investigate.
+- [`results/2026-05-14-cpu-m5.md`](./results/2026-05-14-cpu-m5.md)
+  — Apple M5, 50 RPS, single-point run. sheaf vs raw Ray Serve
+  parity holds at this sustainable RPS (1.3 ms p50 gap).
 - [`results/2026-05-09-sweep-cpu-m1.md`](./results/2026-05-09-sweep-cpu-m1.md)
   — Apple M1, sweep at 10 / 50 / 100 RPS. Sheaf at parity with raw
   Ray Serve at every sustainable RPS (typed-contract overhead is
