@@ -13,6 +13,7 @@ Endpoint (same path as the sheaf server, for load-generator parity):
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -21,6 +22,9 @@ from chronos import BaseChronosPipeline  # ty: ignore[unresolved-import]
 from fastapi import FastAPI
 from pydantic import BaseModel
 from ray import serve
+
+# Replica count parameterised — see sheaf_server.py for rationale.
+_REPLICAS = int(os.environ.get("BENCH_REPLICAS", "1"))
 
 
 # Same input/output shape as sheaf's TimeSeriesRequest/Response.  We
@@ -39,7 +43,7 @@ class Response(BaseModel):
 app = FastAPI()
 
 
-@serve.deployment(num_replicas=1, ray_actor_options={"num_cpus": 1})
+@serve.deployment(num_replicas=_REPLICAS, ray_actor_options={"num_cpus": 1})
 @serve.ingress(app)
 class Forecaster:
     def __init__(self) -> None:

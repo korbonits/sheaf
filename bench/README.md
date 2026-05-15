@@ -90,6 +90,15 @@ machines — re-run the bench on your own to know what to expect on yours.
 
 Runs to date:
 
+- [`results/2026-05-15-cpu-m5-medians.md`](./results/2026-05-15-cpu-m5-medians.md)
+  — Apple M5, multi-sample (N=3) medians across two scenarios:
+  1×1 (single replica) at 10/30/50/75 RPS, and 4×1 (4 replicas)
+  at 100/200/400 RPS.  Surfaces the architectural finding the
+  earlier single-sample runs couldn't show — at 4×1, BentoML
+  scales linearly with workers and sustains 400 RPS cleanly,
+  while both Ray-Serve-based frameworks saturate at 200 RPS due
+  to the single HTTP proxy actor funnel.  Median-of-N=3 kills
+  the single-sample variance that polluted the prior run.
 - [`results/2026-05-14-sweep-cpu-m5.md`](./results/2026-05-14-sweep-cpu-m5.md)
   — Apple M5, sweep at 10 / 50 / 100 RPS. BentoML cleanly sustains
   100 RPS on M5 (no drops, vs 1.2% on M1). Both Ray-Serve-based

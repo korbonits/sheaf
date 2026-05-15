@@ -13,10 +13,16 @@ is up.
 
 from __future__ import annotations
 
+import os
+
 from sheaf import ModelServer, ModelSpec
 from sheaf.api.base import ModelType
 from sheaf.scheduling.batch import BatchPolicy
 from sheaf.spec import ResourceConfig
+
+# Replica count is parameterised so the same fixture serves both the
+# 1×1 single-replica sweep and the 4×1 scale-out sweep.
+_REPLICAS = int(os.environ.get("BENCH_REPLICAS", "1"))
 
 spec = ModelSpec(
     name="forecaster",
@@ -27,7 +33,7 @@ spec = ModelSpec(
         "device_map": "cpu",
         "torch_dtype": "float32",
     },
-    resources=ResourceConfig(num_cpus=1, replicas=1),
+    resources=ResourceConfig(num_cpus=1, replicas=_REPLICAS),
     batch_policy=BatchPolicy(max_batch_size=8, timeout_ms=10),
 )
 

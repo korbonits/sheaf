@@ -19,12 +19,17 @@ Notes:
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import bentoml  # ty: ignore[unresolved-import]
 import torch  # ty: ignore[unresolved-import]
 from chronos import BaseChronosPipeline  # ty: ignore[unresolved-import]
 from pydantic import BaseModel
+
+# Worker count parameterised — apples-to-apples with sheaf/Ray Serve replicas.
+# Each worker is a separate process; BentoML reverse-proxies via uvicorn.
+_WORKERS = int(os.environ.get("BENCH_REPLICAS", "1"))
 
 
 class Request(BaseModel):
@@ -39,7 +44,7 @@ class Response(BaseModel):
 
 @bentoml.service(
     name="forecaster",
-    workers=1,
+    workers=_WORKERS,
     resources={"cpu": "1"},
     traffic={"timeout": 60},
 )

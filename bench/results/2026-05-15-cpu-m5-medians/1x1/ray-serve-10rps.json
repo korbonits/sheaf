@@ -1,0 +1,101 @@
+{
+  "label": "ray-serve-1x1-10",
+  "target_rps": 10,
+  "duration_s": 15,
+  "warmup_s": 5,
+  "n_samples": 3,
+  "url": "http://127.0.0.1:8000/forecaster/predict",
+  "p50_ms": {
+    "median": 19.928749999962747,
+    "iqr": NaN,
+    "min": 19.527083000866696,
+    "max": 20.612457999959588
+  },
+  "p95_ms": {
+    "median": 20.884249999653548,
+    "iqr": NaN,
+    "min": 20.376458000100683,
+    "max": 23.579458000313025
+  },
+  "p99_ms": {
+    "median": 21.407041000202298,
+    "iqr": NaN,
+    "min": 20.738167000672547,
+    "max": 27.1115830000781
+  },
+  "achieved_rps": {
+    "median": 10.066666666666666,
+    "iqr": NaN,
+    "min": 10.066666666666666,
+    "max": 10.066666666666666
+  },
+  "n_errors_total": 0,
+  "raw_samples": [
+    {
+      "target_rps": 10,
+      "duration_s": 15,
+      "warmup_s": 5,
+      "url": "http://127.0.0.1:8000/forecaster/predict",
+      "achieved_rps": 10.066666666666666,
+      "n_samples": 151,
+      "n_errors": 0,
+      "p50_ms": 20.612457999959588,
+      "p95_ms": 23.579458000313025,
+      "p99_ms": 27.1115830000781,
+      "mean_ms": 21.018252145781453,
+      "max_ms": 41.32158299944422,
+      "server": "ray-serve-1x1-10-0",
+      "hardware": {
+        "platform": "macOS-26.4-arm64-arm-64bit",
+        "machine": "arm64",
+        "python": "3.12.13",
+        "cpu_model": "Apple M5",
+        "cpu_count": 10
+      }
+    },
+    {
+      "target_rps": 10,
+      "duration_s": 15,
+      "warmup_s": 5,
+      "url": "http://127.0.0.1:8000/forecaster/predict",
+      "achieved_rps": 10.066666666666666,
+      "n_samples": 151,
+      "n_errors": 0,
+      "p50_ms": 19.527083000866696,
+      "p95_ms": 20.376458000100683,
+      "p99_ms": 20.738167000672547,
+      "mean_ms": 19.484809271531375,
+      "max_ms": 20.84537500013539,
+      "server": "ray-serve-1x1-10-1",
+      "hardware": {
+        "platform": "macOS-26.4-arm64-arm-64bit",
+        "machine": "arm64",
+        "python": "3.12.13",
+        "cpu_model": "Apple M5",
+        "cpu_count": 10
+      }
+    },
+    {
+      "target_rps": 10,
+      "duration_s": 15,
+      "warmup_s": 5,
+      "url": "http://127.0.0.1:8000/forecaster/predict",
+      "achieved_rps": 10.066666666666666,
+      "n_samples": 151,
+      "n_errors": 0,
+      "p50_ms": 19.928749999962747,
+      "p95_ms": 20.884249999653548,
+      "p99_ms": 21.407041000202298,
+      "mean_ms": 20.00758329142856,
+      "max_ms": 26.697875000536442,
+      "server": "ray-serve-1x1-10-2",
+      "hardware": {
+        "platform": "macOS-26.4-arm64-arm-64bit",
+        "machine": "arm64",
+        "python": "3.12.13",
+        "cpu_model": "Apple M5",
+        "cpu_count": 10
+      }
+    }
+  ]
+}
