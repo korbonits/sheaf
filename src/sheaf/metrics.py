@@ -141,9 +141,7 @@ def record_predict(
             m["requests_total"].labels(
                 deployment=deployment, model_type=model_type, status=status
             ),
-            m["request_duration"].labels(
-                deployment=deployment, model_type=model_type
-            ),
+            m["request_duration"].labels(deployment=deployment, model_type=model_type),
         )
         cache[key] = children
     children[0].inc()
