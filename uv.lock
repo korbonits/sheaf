@@ -6309,7 +6309,7 @@ all = [
     { name = "pymilvus" },
     { name = "sam2" },
     { name = "tabpfn" },
-    { name = "timesfm", extra = ["torch"], marker = "extra == 'extra-11-sheaf-serve-all' or extra != 'extra-11-sheaf-serve-moirai' or (extra == 'extra-11-sheaf-serve-moirai' and extra == 'extra-11-sheaf-serve-vision')" },
+    { name = "timesfm", extra = ["torch"], marker = "extra == 'extra-11-sheaf-serve-all' or (extra == 'extra-11-sheaf-serve-moirai' and extra == 'extra-11-sheaf-serve-vision')" },
     { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" } },
     { name = "transformers" },
 ]
@@ -6410,6 +6410,11 @@ optical-flow = [
     { name = "torchvision", version = "0.26.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-11-sheaf-serve-all' or extra != 'extra-11-sheaf-serve-moirai' or (extra == 'extra-11-sheaf-serve-moirai' and extra == 'extra-11-sheaf-serve-vision')" },
 ]
 pose = [
+    { name = "torch", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-11-sheaf-serve-moirai'" },
+    { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-11-sheaf-serve-all' or extra != 'extra-11-sheaf-serve-moirai' or (extra == 'extra-11-sheaf-serve-moirai' and extra == 'extra-11-sheaf-serve-vision')" },
+    { name = "transformers" },
+]
+protein = [
     { name = "torch", version = "2.4.1", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-11-sheaf-serve-moirai'" },
     { name = "torch", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-11-sheaf-serve-all' or extra != 'extra-11-sheaf-serve-moirai' or (extra == 'extra-11-sheaf-serve-moirai' and extra == 'extra-11-sheaf-serve-vision')" },
     { name = "transformers" },
@@ -6519,6 +6524,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'multimodal-generation'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'optical-flow'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'pose'", specifier = ">=2.0.0" },
+    { name = "torch", marker = "extra == 'protein'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'small-molecule'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'tts'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'video'", specifier = ">=2.0.0" },
@@ -6530,6 +6536,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'earth-observation'", specifier = ">=4.37.0" },
     { name = "transformers", marker = "extra == 'genomics'", specifier = ">=4.37.0" },
     { name = "transformers", marker = "extra == 'pose'", specifier = ">=4.46.0" },
+    { name = "transformers", marker = "extra == 'protein'", specifier = ">=4.40.0" },
     { name = "transformers", marker = "extra == 'small-molecule'", specifier = ">=4.37.0" },
     { name = "transformers", marker = "extra == 'tts'", specifier = ">=4.31.0" },
     { name = "transformers", marker = "extra == 'video'", specifier = ">=4.40.0" },
@@ -6538,7 +6545,7 @@ requires-dist = [
     { name = "uni2ts", marker = "extra == 'moirai'", specifier = ">=2.0.0" },
     { name = "xarray", marker = "extra == 'weather'", specifier = ">=2024.1.0" },
 ]
-provides-extras = ["time-series", "tabular", "moirai", "audio", "audio-generation", "tts", "kokoro", "vision", "pose", "optical-flow", "multimodal-generation", "lidar", "molecular", "weather", "earth-observation", "genomics", "materials", "small-molecule", "multimodal", "diffusion", "video", "feast", "metrics", "tracing", "modal", "milvus", "batch", "worker", "docs", "dev", "all"]
+provides-extras = ["time-series", "tabular", "moirai", "audio", "audio-generation", "tts", "kokoro", "vision", "pose", "optical-flow", "multimodal-generation", "lidar", "molecular", "protein", "weather", "earth-observation", "genomics", "materials", "small-molecule", "multimodal", "diffusion", "video", "feast", "metrics", "tracing", "modal", "milvus", "batch", "worker", "docs", "dev", "all"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "modal", specifier = ">=1.4.1" }]

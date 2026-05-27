@@ -23,6 +23,8 @@ def register_builtin_backends() -> None:
     import sheaf.backends.detr  # noqa: F401
     import sheaf.backends.dinov2  # noqa: F401
     import sheaf.backends.esm3  # noqa: F401
+    import sheaf.backends.esmc  # noqa: F401
+    import sheaf.backends.esmfold2  # noqa: F401
     import sheaf.backends.faster_whisper  # noqa: F401
     import sheaf.backends.flux  # noqa: F401
     import sheaf.backends.graphcast  # noqa: F401

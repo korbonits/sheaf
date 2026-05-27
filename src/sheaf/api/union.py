@@ -35,9 +35,14 @@ from sheaf.api.multimodal_generation import (
 from sheaf.api.optical_flow import OpticalFlowRequest, OpticalFlowResponse
 from sheaf.api.point_cloud import PointCloudRequest, PointCloudResponse
 from sheaf.api.pose import PoseRequest, PoseResponse
+from sheaf.api.protein_language import (
+    ProteinLanguageRequest,
+    ProteinLanguageResponse,
+)
 from sheaf.api.satellite import SatelliteRequest, SatelliteResponse
 from sheaf.api.segmentation import SegmentationRequest, SegmentationResponse
 from sheaf.api.small_molecule import SmallMoleculeRequest, SmallMoleculeResponse
+from sheaf.api.structure import StructureRequest, StructureResponse
 from sheaf.api.tabular import TabularRequest, TabularResponse
 from sheaf.api.time_series import TimeSeriesRequest, TimeSeriesResponse
 from sheaf.api.video import VideoRequest, VideoResponse
@@ -65,7 +70,9 @@ AnyRequest = Annotated[
     | PoseRequest
     | OpticalFlowRequest
     | MultimodalGenerationRequest
-    | PointCloudRequest,
+    | PointCloudRequest
+    | ProteinLanguageRequest
+    | StructureRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -91,7 +98,9 @@ AnyResponse = Annotated[
     | PoseResponse
     | OpticalFlowResponse
     | MultimodalGenerationResponse
-    | PointCloudResponse,
+    | PointCloudResponse
+    | ProteinLanguageResponse
+    | StructureResponse,
     Field(discriminator="model_type"),
 ]
 

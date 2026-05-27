@@ -79,6 +79,18 @@ molecular = [
     # ESM-3 requires Python 3.12+; marker prevents resolution errors on 3.11
     "esm>=3.0.0 ; python_full_version >= '3.12'",
 ]
+protein = [
+    # ESMC + ESMFold2 (Biohub 2026-05-27 release).  The `esm` package is not
+    # yet on PyPI; install it manually from git (the upstream README pins
+    # commit c94ed8d):
+    #   pip install esm@git+https://github.com/Biohub/esm.git@c94ed8d
+    # This extra provides the remaining PyTorch / transformers stack.  We
+    # avoid declaring `esm` itself here because it shares the import name
+    # with the pre-2026 `esm` 3.x package used by [molecular] (ESM-3); the
+    # two cannot coexist in the same environment.  Python 3.12+ required.
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
+]
 weather = [
     # graphcast 1.0.0 requires Python 3.11 only; pin <1.0.0 for 3.11 + 3.12 support
     "graphcast>=0.1.0,<1.0.0",
