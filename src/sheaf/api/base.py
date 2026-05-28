@@ -11,6 +11,8 @@ class ModelType(StrEnum):
     TIME_SERIES = "time_series"
     TABULAR = "tabular"
     MOLECULAR = "molecular"
+    PROTEIN_LANGUAGE = "protein_language"
+    STRUCTURE = "structure"
     GENOMIC = "genomic"
     MATERIALS = "materials"
     SMALL_MOLECULE = "small_molecule"

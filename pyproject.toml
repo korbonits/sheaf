@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sheaf-serve"
-version = "0.10.0"
+version = "0.11.0"
 description = "Unified serving layer for non-text foundation models"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -78,6 +78,19 @@ lidar = [
 molecular = [
     # ESM-3 requires Python 3.12+; marker prevents resolution errors on 3.11
     "esm>=3.0.0 ; python_full_version >= '3.12'",
+]
+protein = [
+    # ESMC + ESMFold2 (Biohub 2026-05-27 release).  The `esm` package is not
+    # yet on PyPI; install it manually from git.  We pin to commit 81b3646c
+    # (the revision Modal's official ESMFold2 example uses), which is the
+    # one verified end-to-end via examples/quickstart_protein_modal.py on H100:
+    #   pip install esm@git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833
+    # This extra provides the remaining PyTorch / transformers stack.  We
+    # avoid declaring `esm` itself here because it shares the import name
+    # with the pre-2026 `esm` 3.x package used by [molecular] (ESM-3); the
+    # two cannot coexist in the same environment.  Python 3.12+ required.
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
 ]
 weather = [
     # graphcast 1.0.0 requires Python 3.11 only; pin <1.0.0 for 3.11 + 3.12 support

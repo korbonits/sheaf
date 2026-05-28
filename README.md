@@ -29,13 +29,16 @@ Each model type gets a typed request/response contract. Batching, caching, and s
 > curl https://korbonits--sheaf-demo-modalserver---init----locals---serve.modal.run/chronos/health
 > ```
 
-> **Requires Python 3.11+.** macOS's system `python3` is usually 3.10 — bootstrap a 3.11 venv first via [`uv`](https://docs.astral.sh/uv/) (`uv venv --python 3.11 .venv && source .venv/bin/activate`) or `pyenv`. The `[molecular]` extra (ESM-3) additionally requires Python 3.12+.
+> **Requires Python 3.11+.** macOS's system `python3` is usually 3.10 — bootstrap a 3.11 venv first via [`uv`](https://docs.astral.sh/uv/) (`uv venv --python 3.11 .venv && source .venv/bin/activate`) or `pyenv`. The `[molecular]` and `[protein]` extras (ESM-3 / ESMC / ESMFold2) additionally require Python 3.12+, and the two are mutually exclusive (they share the `esm` import name from different packages).
 
 ```bash
 pip install sheaf-serve                           # core only
 pip install "sheaf-serve[time-series]"            # + Chronos2 / TimesFM / Moirai
 pip install "sheaf-serve[tabular]"                # + TabPFN
 pip install "sheaf-serve[molecular]"              # + ESM-3  (Python 3.12+)
+pip install "sheaf-serve[protein]"                # + ESMC / ESMFold2 deps (Python 3.12+)
+# then also (no PyPI release yet — pinned commit per upstream README):
+pip install "esm@git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833"
 pip install "sheaf-serve[genomics]"               # + Nucleotide Transformer
 pip install "sheaf-serve[small-molecule]"         # + MolFormer
 pip install "sheaf-serve[materials]"              # + MACE-MP
@@ -179,6 +182,18 @@ See [`examples/`](examples/) for time series comparison, tabular, audio, vision,
 
 ---
 
+## Protein models
+
+Sheaf serves three protein foundation models, each via its own typed contract:
+
+- **ESM-3** (`api/molecular.py`, backend `esm3`) — per-sequence pooled embeddings (mean / cls). Use for sequence-level similarity, clustering, and downstream featurization. `[molecular]` extra (Python 3.12+).
+- **ESMC** (`api/protein_language.py`, backend `esmc`) — per-token logits + optional per-token embeddings from Biohub's 2026-05-27 release. Use when you need masked-LM logits, per-residue representations, or all-layer hidden states. Default model: `Biohub/ESMC-6B`. `[protein]` extra (Python 3.12+); 300M / 600M variants are Forge API-only and currently raise `NotImplementedError`.
+- **ESMFold2** (`api/structure.py`, backend `esmfold2`) — protein structure prediction with inference-time scaling. Exposes `num_loops`, `num_sampling_steps`, `num_samples`, `seed` as first-class request fields; returns PDB / mmCIF + pLDDT + pTM/ipTM + optional PAE. Default model: `biohub/ESMFold2`. `[protein]` extra (Python 3.12+).
+
+`[molecular]` (ESM-3) and `[protein]` (ESMC + ESMFold2) share the `esm` import name from different upstream packages — install one **or** the other in a given environment. See [`docs/adr/0001-esmc-esmfold2-integration.md`](docs/adr/0001-esmc-esmfold2-integration.md) for the rationale.
+
+Biohub release announcement: <https://github.com/Biohub/esm> · preprint: <https://biohub.ai/papers/esm_protein.pdf>.
+
 ## Supported model types
 
 | Type | Status | Backends |
@@ -193,6 +208,8 @@ See [`examples/`](examples/) for time series comparison, tabular, audio, vision,
 | Depth estimation | ✅ v0.3 | Depth Anything v2 |
 | Object detection | ✅ v0.3 | DETR / RT-DETR |
 | Protein / molecular | ✅ v0.3 | ESM-3 (Python 3.12+) |
+| Protein language modeling | ✅ v0.11 | ESMC 6B (Biohub) |
+| Protein structure prediction | ✅ v0.11 | ESMFold2 (Biohub) — inference-time scaling |
 | Genomics | ✅ v0.3 | Nucleotide Transformer |
 | Small molecule | ✅ v0.3 | MolFormer-XL |
 | Materials science | ✅ v0.3 | MACE-MP-0 |
@@ -308,6 +325,17 @@ Today sheaf ships three deployment paths: `ModelServer` (a local Ray cluster you
 - [ ] Reference `Dockerfile` (multi-stage, uv-based; CPU base + CUDA variant) so teams aren't building this from scratch.  Pinned to a sheaf release; rebuilt on tag.
 - [ ] `examples/k8s/` with a `RayService` manifest — KubeRay's canonical Ray-on-K8s shape — and a short `README.md` covering prereqs (KubeRay operator installed), `kubectl apply`, and a port-forward smoke test.
 - [ ] GitHub Actions workflow that builds + pushes the Dockerfile to `ghcr.io/korbonits/sheaf-serve:vX.Y.Z` on `v*` tag push, mirroring the PyPI publish flow.
+
+**v0.11 — Biohub protein-biology release integration**
+
+Biohub's "world model of protein biology" landed 2026-05-27 under MIT.  Sheaf integrates the two model artifacts as first-class typed contracts; ESM Atlas (dataset) is out of scope.  See [`docs/adr/0001-esmc-esmfold2-integration.md`](docs/adr/0001-esmc-esmfold2-integration.md).
+
+- [x] `ESMCBackend` — per-token logits + per-token embeddings via `transformers.AutoModelForMaskedLM`, default `Biohub/ESMC-6B`.
+- [x] `ESMFold2Backend` — protein structure prediction with `num_loops` / `num_sampling_steps` / `num_samples` / `seed` as first-class request fields, returning PDB / mmCIF + pLDDT + pTM/ipTM + optional PAE.
+- [x] New `STRUCTURE` model category — first non-tensor output category (structure file as text).
+- [x] `[protein]` install extra; `esm` from `git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833` documented (no PyPI release yet).
+- [x] End-to-end GPU smoke — `examples/quickstart_protein_modal.py` runs `ESMFold2Backend` on H100 via Modal (~70s cold start to a persistent volume, sub-second per fold). 53-residue target → 43,088-char mmCIF, pTM=0.2465.
+- [ ] Forge / Biohub-Platform HTTP-client variants for the ESMC 300M / 600M / ESMFold2-fast API-only models.
 
 ---
 
