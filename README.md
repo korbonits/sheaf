@@ -38,7 +38,7 @@ pip install "sheaf-serve[tabular]"                # + TabPFN
 pip install "sheaf-serve[molecular]"              # + ESM-3  (Python 3.12+)
 pip install "sheaf-serve[protein]"                # + ESMC / ESMFold2 deps (Python 3.12+)
 # then also (no PyPI release yet — pinned commit per upstream README):
-pip install "esm@git+https://github.com/Biohub/esm.git@c94ed8d"
+pip install "esm@git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833"
 pip install "sheaf-serve[genomics]"               # + Nucleotide Transformer
 pip install "sheaf-serve[small-molecule]"         # + MolFormer
 pip install "sheaf-serve[materials]"              # + MACE-MP
@@ -333,8 +333,8 @@ Biohub's "world model of protein biology" landed 2026-05-27 under MIT.  Sheaf in
 - [x] `ESMCBackend` — per-token logits + per-token embeddings via `transformers.AutoModelForMaskedLM`, default `Biohub/ESMC-6B`.
 - [x] `ESMFold2Backend` — protein structure prediction with `num_loops` / `num_sampling_steps` / `num_samples` / `seed` as first-class request fields, returning PDB / mmCIF + pLDDT + pTM/ipTM + optional PAE.
 - [x] New `STRUCTURE` model category — first non-tensor output category (structure file as text).
-- [x] `[protein]` install extra; `esm` from `git+https://github.com/Biohub/esm.git@c94ed8d` documented (no PyPI release yet).
-- [ ] End-to-end smoke tests behind `@pytest.mark.gpu` once a GPU runner is wired up.
+- [x] `[protein]` install extra; `esm` from `git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833` documented (no PyPI release yet).
+- [x] End-to-end GPU smoke — `examples/quickstart_protein_modal.py` runs `ESMFold2Backend` on H100 via Modal (~70s cold start to a persistent volume, sub-second per fold). 53-residue target → 43,088-char mmCIF, pTM=0.2465.
 - [ ] Forge / Biohub-Platform HTTP-client variants for the ESMC 300M / 600M / ESMFold2-fast API-only models.
 
 ---

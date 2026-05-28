@@ -81,9 +81,10 @@ molecular = [
 ]
 protein = [
     # ESMC + ESMFold2 (Biohub 2026-05-27 release).  The `esm` package is not
-    # yet on PyPI; install it manually from git (the upstream README pins
-    # commit c94ed8d):
-    #   pip install esm@git+https://github.com/Biohub/esm.git@c94ed8d
+    # yet on PyPI; install it manually from git.  We pin to commit 81b3646c
+    # (the revision Modal's official ESMFold2 example uses), which is the
+    # one verified end-to-end via examples/quickstart_protein_modal.py on H100:
+    #   pip install esm@git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833
     # This extra provides the remaining PyTorch / transformers stack.  We
     # avoid declaring `esm` itself here because it shares the import name
     # with the pre-2026 `esm` 3.x package used by [molecular] (ESM-3); the

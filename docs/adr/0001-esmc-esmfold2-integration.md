@@ -32,10 +32,13 @@ ESM Atlas is a dataset, not a model, and is out of scope for this PR.
 
 ### Python package
 
-- Distribution: `pip install esm@git+https://github.com/Biohub/esm.git@c94ed8d`.
+- Distribution: `pip install esm@git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833`.
   A PyPI release is described as "coming soon" but is **not** yet published as
-  of this PR. We pin to commit `c94ed8d` to stay reproducible; we will switch
-  to a PyPI version constraint when one ships.
+  of this PR. We pin to commit `81b3646c9429ea8458918415ad6a46178cb59833` to stay reproducible; we will switch
+  to a PyPI version constraint when one ships. (Originally pinned to `c94ed8d`,
+  the SHA in the upstream README on 2026-05-27; bumped to `81b3646c…` after the
+  Modal H100 smoke verified that revision end-to-end and to match the pin in
+  Modal's official `modal-examples/06_gpu_and_ml/protein-folding/esmfold2.py`.)
 - Naming conflict: the new `esm` package shares the import name with the
   pre-2026 `esm` package (PyPI 3.x) used by our existing `ESM3Backend`
   (`sheaf.backends.esm3`, extra `[molecular]`). Both cannot be installed in
@@ -141,7 +144,7 @@ heavyweight imports at module level.
 
 ```toml
 protein = [
-    "esm @ git+https://github.com/Biohub/esm.git@c94ed8d ; python_full_version >= '3.12'",
+    "esm @ git+https://github.com/Biohub/esm.git@81b3646c9429ea8458918415ad6a46178cb59833 ; python_full_version >= '3.12'",
     "transformers>=4.40.0",
     "torch>=2.0.0",
 ]
@@ -223,7 +226,7 @@ inconsistent telemetry across the 25+ existing backends.
   this PR: `PROTEIN_LANGUAGE`, `STRUCTURE`).
 - The `[molecular]` and `[protein]` extras are mutually exclusive at
   install time. Documentation needs to flag this.
-- The pinned `esm @ git+...@c94ed8d` will become stale; we should track a
+- The pinned `esm @ git+...@81b3646c9429ea8458918415ad6a46178cb59833` will become stale; we should track a
   PyPI release in the Biohub repo and switch when one lands.
 - `STRUCTURE` is the first model category whose output is fundamentally
   non-tensor (PDB / mmCIF strings, with structured side-channel data
