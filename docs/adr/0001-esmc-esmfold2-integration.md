@@ -85,6 +85,15 @@ documented as outputs in the paper but are not shown in the README sample;
 we leave the `pae` and `sample_scores` response fields optional and populate
 them only when present on the result object.
 
+**pLDDT scale**: empirically (verified by a Modal H100 smoke against the
+default `biohub/ESMFold2` weights, 2026-05-27), ESMFold2 returns `plddt` as
+a `torch.Tensor` of fractional values on `[0, 1]` — *not* the conventional
+AlphaFold / ESMFold-v1 `[0, 100]` scale. We pass through faithfully (no
+backend-side scaling) and document the scale on `StructureResponse.plddt`
+so callers can multiply by 100 themselves if they want the conventional
+values. Faithful pass-through is consistent with Sheaf's general "validate
+at the boundary, don't transform inside backends" convention.
+
 ## Decision
 
 ### 1. Two new model categories

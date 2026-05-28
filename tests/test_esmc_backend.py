@@ -149,20 +149,24 @@ def _make_model_output(
     with_hidden_states: bool = False,
     n_layers: int = 4,
 ) -> MagicMock:
+    # Mirrors transformers' MaskedLMOutput: .logits always; .hidden_states only
+    # when the model was called with output_hidden_states=True (or None / absent
+    # otherwise — the backend reads it lazily and only when needed).
     logits = FakeTensor(np.full((n, seq_len, vocab), 0.5, dtype=np.float32))
-    last_hidden = FakeTensor(np.full((n, seq_len, hidden_dim), 1.0, dtype=np.float32))
-    out = MagicMock()
+    out = MagicMock(spec=["logits", "hidden_states"])
     out.logits = logits
-    out.last_hidden_state = last_hidden
     if with_hidden_states:
-        # Each layer is a (n, seq_len, hidden_dim) tensor; last is the same
-        # as last_hidden_state.
         out.hidden_states = tuple(
             FakeTensor(np.full((n, seq_len, hidden_dim), float(i), dtype=np.float32))
             for i in range(n_layers)
         )
     else:
-        out.hidden_states = None
+        # Single-layer tuple — matches what the model would return when called
+        # with output_hidden_states=True for the embeddings-only path. The
+        # backend always sets the flag when it needs embeddings.
+        out.hidden_states = (
+            FakeTensor(np.full((n, seq_len, hidden_dim), 1.0, dtype=np.float32)),
+        )
     return out
 
 

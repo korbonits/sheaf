@@ -128,10 +128,14 @@ class ESMCBackend(ModelBackend):
         attention_mask = inputs["attention_mask"]  # (N, L)
         seq_lens: list[int] = attention_mask.sum(dim=1).cpu().int().tolist()
 
+        # MaskedLMOutput has .logits + .hidden_states (when requested) but no
+        # .last_hidden_state — so requesting embeddings forces the hidden-states
+        # flag on the underlying model call.
+        need_hidden = request.return_embeddings or request.output_hidden_states
         with torch.inference_mode():
             output = self._model(
                 **inputs,
-                output_hidden_states=request.output_hidden_states,
+                output_hidden_states=need_hidden,
             )
 
         logits_out: list[list[list[float]]] | None = None
@@ -142,16 +146,9 @@ class ESMCBackend(ModelBackend):
                 logits[i, : seq_lens[i], :].tolist() for i in range(len(seq_lens))
             ]
 
-        # Per-token last-layer embeddings: last_hidden_state, or
-        # hidden_states[-1] when output_hidden_states=True.
         embeddings_out: list[list[list[float]]] | None = None
-        if request.return_embeddings or request.output_hidden_states:
-            last_hidden = (
-                output.hidden_states[-1]
-                if request.output_hidden_states
-                else output.last_hidden_state
-            )
-            last_hidden = last_hidden.cpu().float()
+        if need_hidden:
+            last_hidden = output.hidden_states[-1].cpu().float()
             embeddings_out = [
                 last_hidden[i, : seq_lens[i], :].tolist() for i in range(len(seq_lens))
             ]

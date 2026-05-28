@@ -87,8 +87,11 @@ class StructureResponse(BaseResponse):
             (per ``StructureRequest.output_format``). When
             ``num_samples > 1`` this is the highest-confidence sample.
         structure_format: ``"mmcif"`` or ``"pdb"``, matching the request.
-        plddt: Per-residue predicted-Local-Distance-Difference-Test score
-            in [0, 100]. Length = total residues across all chains.
+        plddt: Per-residue predicted-Local-Distance-Difference-Test score.
+            ESMFold2 reports pLDDT on **[0, 1]** (fractional), not the
+            conventional AlphaFold / ESMFold-v1 [0, 100] scale — multiply by
+            100 if you need the conventional values. Length = total residues
+            across all chains.
         ptm: Predicted-TM score for the structure as a whole. ``None`` if
             the model did not produce one.
         iptm: Interface-pTM (for multi-chain complexes). ``None`` for

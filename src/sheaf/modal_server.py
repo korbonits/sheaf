@@ -65,9 +65,11 @@ from sheaf.api.multimodal_generation import MultimodalGenerationRequest
 from sheaf.api.optical_flow import OpticalFlowRequest
 from sheaf.api.point_cloud import PointCloudRequest
 from sheaf.api.pose import PoseRequest
+from sheaf.api.protein_language import ProteinLanguageRequest
 from sheaf.api.satellite import SatelliteRequest
 from sheaf.api.segmentation import SegmentationRequest
 from sheaf.api.small_molecule import SmallMoleculeRequest
+from sheaf.api.structure import StructureRequest
 from sheaf.api.tabular import TabularRequest
 from sheaf.api.time_series import TimeSeriesRequest
 from sheaf.api.video import VideoRequest
@@ -101,7 +103,9 @@ AnyRequest = Annotated[
     | PoseRequest
     | OpticalFlowRequest
     | MultimodalGenerationRequest
-    | PointCloudRequest,
+    | PointCloudRequest
+    | ProteinLanguageRequest
+    | StructureRequest,
     Field(discriminator="model_type"),
 ]
 
@@ -141,6 +145,8 @@ def _build_asgi_app(specs: list[ModelSpec], *, load_backends: bool = True) -> An
     import sheaf.backends.detr  # noqa: F401
     import sheaf.backends.dinov2  # noqa: F401
     import sheaf.backends.esm3  # noqa: F401
+    import sheaf.backends.esmc  # noqa: F401
+    import sheaf.backends.esmfold2  # noqa: F401
     import sheaf.backends.faster_whisper  # noqa: F401
     import sheaf.backends.flux  # noqa: F401
     import sheaf.backends.graphcast  # noqa: F401
