@@ -326,7 +326,7 @@ Today sheaf ships three deployment paths: `ModelServer` (a local Ray cluster you
 - [ ] `examples/k8s/` with a `RayService` manifest — KubeRay's canonical Ray-on-K8s shape — and a short `README.md` covering prereqs (KubeRay operator installed), `kubectl apply`, and a port-forward smoke test.
 - [ ] GitHub Actions workflow that builds + pushes the Dockerfile to `ghcr.io/korbonits/sheaf-serve:vX.Y.Z` on `v*` tag push, mirroring the PyPI publish flow.
 
-**v0.11 — Biohub protein-biology release integration (in progress, draft PR)**
+**v0.11 — Biohub protein-biology release integration**
 
 Biohub's "world model of protein biology" landed 2026-05-27 under MIT.  Sheaf integrates the two model artifacts as first-class typed contracts; ESM Atlas (dataset) is out of scope.  See [`docs/adr/0001-esmc-esmfold2-integration.md`](docs/adr/0001-esmc-esmfold2-integration.md).
 
