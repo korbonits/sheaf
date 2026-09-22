@@ -91,6 +91,7 @@ nav:
       - Offline batch jobs: concepts/batch.md
       - Async-job worker: concepts/worker.md
       - LoRA multiplexing: concepts/lora.md
+      - Inference optimization kits: concepts/model_opt.md
   - Models:
       - models/index.md
   - Deployment:

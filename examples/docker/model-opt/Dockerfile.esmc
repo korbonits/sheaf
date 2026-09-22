@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1.7
+#
+# Sheaf on the ESM C optimization kit's pinned stack.  Built by
+# build_esmc.sh, which first builds the kit's own image (KIT_IMAGE) from the
+# kits tree unchanged.  Build context: the Sheaf repository root.
+#
+# The kit's lock pins every runtime package (torch 2.11.0+cu130, numpy 2.5.2,
+# pydantic, esm @ 43ccece2, the transformers fork, ...).  Sheaf is installed
+# with a constraints file generated from that exact environment, so pip can
+# add Sheaf's own dependencies (ray[serve], fastapi, ...) but never move a
+# pinned one; the kit's pin check runs afterwards and fails the build if it
+# did.
+#
+# Run (Ray Serve / KubeRay): mount the kit-fetched weights at /weights and a
+# node-local, private compile-cache directory at /var/cache/sheaf/model_opt_jit,
+# then start your server script, e.g. examples/docker/model-opt/server_esmc.py.
+ARG KIT_IMAGE=esmc-kit:dev
+FROM ${KIT_IMAGE}
+
+ARG KITS_REPO
+ARG KITS_REF
+
+COPY pyproject.toml README.md LICENSE NOTICE /opt/sheaf/
+COPY src /opt/sheaf/src
+COPY examples/docker/model-opt/server_esmc.py /workspace/server.py
+
+RUN python -m pip freeze --all --exclude-editable \
+      | grep -vE ' @ |^(pip|setuptools)==' > /tmp/kit-constraints.txt \
+ && python -m pip install --no-cache-dir -c /tmp/kit-constraints.txt /opt/sheaf \
+ && python -I /kit/esmc/stock/check_pins.py \
+ && python -c "import sheaf, esmc_opt; print('sheaf', sheaf.__version__, 'esmc_opt', esmc_opt.__version__)"
+
+# The kits' licence, notice and attribution travel with the image (Apache-2.0 §4):
+# the tree's top-level LICENSE + NOTICE (from the "kits" build context) and the
+# kit's own LICENSE, THIRD_PARTY_NOTICES.md and third-party licence texts.
+COPY --from=kits LICENSE /usr/share/doc/sheaf-model-opt/kits.LICENSE
+COPY --from=kits NOTICE /usr/share/doc/sheaf-model-opt/kits.NOTICE
+RUN mkdir -p /usr/share/doc/sheaf-model-opt \
+ && cp /kit/esmc/LICENSE /usr/share/doc/sheaf-model-opt/esmc-kit.LICENSE \
+ && cp /kit/esmc/THIRD_PARTY_NOTICES.md /usr/share/doc/sheaf-model-opt/esmc-kit.THIRD_PARTY_NOTICES.md \
+ && cp -r /kit/esmc/third_party_licenses /usr/share/doc/sheaf-model-opt/esmc-kit.third_party_licenses
+
+ENV PYTHONUNBUFFERED=1 \
+    HF_HOME=/weights/esmc/hf \
+    HF_HUB_OFFLINE=1 \
+    SHEAF_MODEL_OPT_JIT_ROOT=/var/cache/sheaf/model_opt_jit \
+    SHEAF_KITS_REPO=${KITS_REPO} \
+    SHEAF_KITS_REF=${KITS_REF}
+
+WORKDIR /workspace
+EXPOSE 8000
+CMD ["python", "server.py"]

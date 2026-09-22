@@ -1,0 +1,25 @@
+sheaf-serve
+Copyright 2026 Alex Korbonits
+
+This product is licensed under the Apache License, Version 2.0 (LICENSE).
+
+INFERENCE OPTIMIZATION KITS (optional, not included in the Python package)
+
+sheaf-serve can engage the biomolecular inference optimization kits from
+"uplifting-biomolecular-modeling"
+(https://github.com/anthropics/uplifting-biomolecular-modeling),
+Copyright 2026 Anthropic, PBC, licensed under the Apache License, Version 2.0.
+The kits' original code is Apache-2.0; each kit's stock/ directory carries an
+upstream project under that project's own licence (esm: MIT, Copyright 2026
+Chan Zuckerberg Biohub, Inc.; the Biohub transformers fork: Apache-2.0,
+Copyright 2018- The Hugging Face team), as described in the kits' NOTICE and
+per-kit THIRD_PARTY_NOTICES.md.
+
+The sheaf-serve wheel and source distribution contain none of the kits' code:
+sheaf.model_opt imports a kit package (esmc_opt, esmfold2_opt) only when a
+deployment opts in via ModelSpec.model_opt and the kit is installed. Container
+images built by examples/docker/model-opt/ install a kit from the kits tree at
+a pinned commit and carry the tree's LICENSE and NOTICE and the kit's LICENSE,
+THIRD_PARTY_NOTICES.md and third_party_licenses/ under
+/usr/share/doc/sheaf-model-opt/. See third_party/README.md for the pinned
+commit and docs/concepts/model_opt.md for usage.

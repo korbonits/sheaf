@@ -18,3 +18,6 @@ short version of one design decision.
 - **[LoRA multiplexing](lora.md)** — adapter-aware sub-batching for
   diffusion backends; per-request adapter selection on a single
   deployment.
+- **[Inference optimization kits](model_opt.md)** — opt-in `off` /
+  `exact` / `fast` / `big` modes from Anthropic's biomolecular kits
+  (ESM C today); hardware and trust-model caveats.
