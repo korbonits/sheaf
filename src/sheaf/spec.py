@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from sheaf.api.base import ModelType
 from sheaf.cache import CacheConfig
 from sheaf.lora import LoRAConfig
+from sheaf.model_opt import ModelOptConfig
 from sheaf.scheduling.batch import BatchPolicy
 
 
@@ -81,6 +82,16 @@ class ModelSpec(BaseModel):
             "Cannot be combined with ``batch_policy.bucket_by`` — when ``lora`` "
             "is set, requests are automatically grouped by their resolved "
             "adapter selection inside each batch window."
+        ),
+    )
+
+    model_opt: ModelOptConfig | None = Field(
+        default=None,
+        description=(
+            "Inference optimization kit mode (off/exact/fast/big) for "
+            "backends that support one (see sheaf.model_opt).  None (the "
+            "default) keeps the backend's pre-existing code path and imports "
+            "nothing of any kit."
         ),
     )
 

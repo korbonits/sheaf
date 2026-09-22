@@ -16,6 +16,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from sheaf.api.base import ModelType
+from sheaf.model_opt import ModelOptConfig
 
 
 class WorkerSpec(BaseModel):
@@ -51,6 +52,9 @@ class WorkerSpec(BaseModel):
     # type[ModelBackend] | None — Any avoids Pydantic schema generation issues
     backend_cls: Any = None
     backend_kwargs: dict = Field(default_factory=dict)
+    # Inference optimization kit mode, as on ModelSpec.model_opt.  A worker
+    # process serves exactly one spec, so no extra isolation is needed.
+    model_opt: ModelOptConfig | None = None
 
     # Queue + result store. Use Any so the spec module doesn't import the
     # queue module (and through it, redis) at import time. Worker module

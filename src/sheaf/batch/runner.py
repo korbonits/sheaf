@@ -28,6 +28,7 @@ from pydantic import TypeAdapter
 from sheaf.api.union import AnyRequest
 from sheaf.backends.base import ModelBackend
 from sheaf.batch.spec import BatchSpec, JsonlSink, JsonlSource
+from sheaf.model_opt import apply_model_opt
 
 _logger = logging.getLogger(__name__)
 
@@ -90,6 +91,7 @@ def _build_backend(spec: BatchSpec) -> ModelBackend:
             f"Unknown backend '{spec.backend}'. Registered backends: {list(_registry)}"
         )
     backend: ModelBackend = backend_cls(**spec.backend_kwargs)
+    apply_model_opt(backend, spec.model_opt, spec.name)
     backend.load()
     return backend
 

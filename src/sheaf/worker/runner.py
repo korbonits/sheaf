@@ -33,6 +33,7 @@ from pydantic import TypeAdapter
 from sheaf.api.union import AnyRequest
 from sheaf.backends.base import ModelBackend
 from sheaf.metrics import record_predict
+from sheaf.model_opt import apply_model_opt
 from sheaf.tracing import record_exception, trace_span
 from sheaf.worker.queue import Job, JobResult
 from sheaf.worker.spec import WorkerSpec
@@ -60,6 +61,7 @@ def _build_backend(spec: WorkerSpec) -> ModelBackend:
             f"Unknown backend '{spec.backend}'. Registered backends: {list(_registry)}"
         )
     backend: ModelBackend = backend_cls(**spec.backend_kwargs)
+    apply_model_opt(backend, spec.model_opt, spec.name)
     backend.load()
     return backend
 
