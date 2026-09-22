@@ -182,6 +182,11 @@ class ESMCBackend(ModelBackend):
                 "(esmc/CHANGES.md 'Switches'); levers_off must be empty."
             )
         mode = model_opt.mode
+        if mode != "off" and not str(self._device).startswith("cuda"):
+            raise ValueError(
+                f"model_opt mode {mode!r} needs a CUDA device (the ESM C kit's "
+                f"levers are GPU kernels); got device={self._device!r}."
+            )
         owner = f"esmc:{self._model_name}"
         claim_process(_KIT, mode, owner)
 

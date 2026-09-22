@@ -424,6 +424,15 @@ def test_levers_off_rejected() -> None:
         _load(backend, _make_client(), _FakeKit())
 
 
+def test_exact_on_cpu_rejected() -> None:
+    from sheaf.backends.esmc import ESMCBackend
+
+    backend = ESMCBackend(device="cpu")
+    apply_model_opt(backend, ModelOptConfig(mode="exact"), "dep")
+    with pytest.raises(ValueError, match="needs a CUDA device"):
+        _load(backend, _make_client(), _FakeKit())
+
+
 def test_second_mode_in_same_process_refused() -> None:
     first = _backend("exact")
     _load(first, _make_client(), _FakeKit())
