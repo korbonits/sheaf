@@ -21,10 +21,30 @@ results back to ragged per-sequence lengths before serialisation.
 ``AutoTokenizer`` and ``AutoModelForMaskedLM`` are stored as instance
 attributes at ``load()`` time so the heavy dependency stays lazy and tests
 can inject mocks without ``transformers`` or ``torch`` installed.
+
+Inference optimization kit (``ModelSpec.model_opt``)
+----------------------------------------------------
+With ``model_opt`` set, the backend loads through ``esm``'s own client
+instead — ``esm.models.esmc.ESMC.from_pretrained`` (bf16 on GPU, the shipped
+varlen flash-attention class) — and runs the padded batched forward
+``client.model(input_ids=…, attention_mask=…)`` under bf16 autocast.  That is
+the ESM C kit's stock reference ("batched" regime), which the kit's patches
+attach to:
+
+- ``mode="off"``   — that stock path, nothing of the kit imported.
+- ``mode="exact"`` — ``esmc_opt.enable("exact")`` before the client is built;
+  outputs byte-identical to ``off`` for the same batch composition.
+
+The kit requires ``esm`` 3.4.0 at commit ``43ccece2`` with its pinned stack
+(torch 2.11.0+cu130, flash-attn 2.7.4.post1, Transformer Engine 2.15.0) — see
+``docs/concepts/model_opt.md``.  With ``model_opt=None`` (the default) none of
+this runs: the transformers path above is unchanged.
 """
 
 from __future__ import annotations
 
+import contextlib
+import sys
 from typing import Any
 
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
@@ -33,10 +53,36 @@ from sheaf.api.protein_language import (
     ProteinLanguageResponse,
 )
 from sheaf.backends.base import ModelBackend
+from sheaf.model_opt import (
+    ModelOptConfig,
+    ModelOptNotActiveError,
+    capture_kit_lines,
+    claim_process,
+    configure_jit_env,
+    stack_key,
+)
 from sheaf.registry import register_backend
 
 _DEFAULT_MODEL = "Biohub/ESMC-6B"
 _FORGE_MODELS = frozenset({"esmc-300m-2024-12", "esmc-600m-2024-12"})
+
+# model_opt path: accepted model names -> (esm SDK name, ESM C kit variant).
+# HF repo IDs are matched case-insensitively (the default is "Biohub/ESMC-6B",
+# the SDK's constant is "biohub/ESMC-6B").
+_SDK_MODELS = {
+    "esmc_300m": ("esmc_300m", "300m"),
+    "biohub/esmc-300m": ("esmc_300m", "300m"),
+    "esmc_600m": ("esmc_600m", "600m"),
+    "biohub/esmc-600m": ("esmc_600m", "600m"),
+    "esmc_6b": ("esmc_6b", "6b"),
+    "biohub/esmc-6b": ("esmc_6b", "6b"),
+}
+_KIT = "esmc"
+_KIT_TAG = "esmc-opt"
+# Human ubiquitin — the kit README's own public warm-up sequence.
+_WARMUP_SEQUENCE = (
+    "MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG"
+)
 
 
 @register_backend("esmc")
@@ -66,10 +112,19 @@ class ESMCBackend(ModelBackend):
         self._device_map = device_map
         self._model: Any = None
         self._tokenizer: Any = None
+        self._model_opt: ModelOptConfig | None = None
+        # model_opt path only: the esm SDK client, and the kit's report.
+        self._client: Any = None
+        self.model_opt_report: dict[str, Any] | None = None
+        self.model_opt_lines: list[str] = []
 
     @property
     def model_type(self) -> str:
         return ModelType.PROTEIN_LANGUAGE
+
+    def supported_opt_modes(self) -> frozenset[str]:
+        # The ESM C kit ships off + exact only (no fast / big for this model).
+        return frozenset({"off", "exact"})
 
     def load(self) -> None:
         if self._model_name in _FORGE_MODELS:
@@ -79,6 +134,9 @@ class ESMCBackend(ModelBackend):
                 "in v0.11. See docs/adr/0001-esmc-esmfold2-integration.md "
                 "for the rationale and roadmap."
             )
+        if self._model_opt is not None:
+            self._load_sdk(self._model_opt)
+            return
         try:
             from transformers import (  # ty: ignore[unresolved-import]
                 AutoModelForMaskedLM,
@@ -98,6 +156,88 @@ class ESMCBackend(ModelBackend):
         if self._device_map is None:
             self._model = self._model.to(self._device)
         self._model.eval()
+
+    # ------------------------------------------------------------------
+    # model_opt path — esm SDK client, optionally under the ESM C kit
+    # ------------------------------------------------------------------
+
+    def _load_sdk(self, model_opt: ModelOptConfig) -> None:
+        sdk = _SDK_MODELS.get(self._model_name.lower())
+        if sdk is None:
+            raise ValueError(
+                f"model_opt needs one of the ESM C kit's checkpoints; got "
+                f"model_name={self._model_name!r}.  Use one of "
+                f"{sorted({v[0] for v in _SDK_MODELS.values()})} or the "
+                "matching biohub/ESMC-* repo ID."
+            )
+        sdk_name, variant = sdk
+        if self._device_map is not None:
+            raise ValueError(
+                "model_opt loads through esm's ESMC.from_pretrained onto one "
+                "device; device_map is not supported on that path."
+            )
+        if model_opt.levers_off:
+            raise ValueError(
+                "The ESM C kit has no switch that drops a lever from a mode "
+                "(esmc/CHANGES.md 'Switches'); levers_off must be empty."
+            )
+        mode = model_opt.mode
+        owner = f"esmc:{self._model_name}"
+        claim_process(_KIT, mode, owner)
+
+        import torch  # ty: ignore[unresolved-import]
+
+        if mode != "off":
+            configure_jit_env(model_opt, stack_key())
+            with capture_kit_lines(_KIT_TAG, owner, self.model_opt_lines):
+                self.model_opt_report = _enable_kit(mode, variant)
+
+        try:
+            from esm.models.esmc import ESMC  # ty: ignore[unresolved-import]
+        except ImportError as e:
+            raise ImportError(
+                "model_opt on the ESMC backend requires esm 3.4.0 "
+                "(git+https://github.com/Biohub/esm.git@"
+                "43ccece2ad485f27db46afdb67da2a9601e8f106) with the ESM C "
+                "kit's pinned stack.  See docs/concepts/model_opt.md."
+            ) from e
+
+        with capture_kit_lines(_KIT_TAG, owner, self.model_opt_lines):
+            try:
+                client = ESMC.from_pretrained(
+                    sdk_name, device=torch.device(self._device)
+                )
+            except Exception as e:
+                # The kit raises its partial-activation refusal here: a lever
+                # of the mode could not be applied to the loaded model.
+                if _is_kit_refusal(e):
+                    raise ModelOptNotActiveError(f"[{_KIT_TAG}] NOT ACTIVE: {e}") from e
+                raise
+        self._client = client
+        self._model = client.model
+        self._tokenizer = client.tokenizer
+        self._model.eval()
+
+        if mode != "off":
+            # One short forward at load: the first request never pays for
+            # template recording / Triton warm-up, and a refusal surfaces now.
+            with capture_kit_lines(_KIT_TAG, owner, self.model_opt_lines):
+                self._run(
+                    ProteinLanguageRequest(
+                        model_name=self._model_name,
+                        sequences=[_WARMUP_SEQUENCE],
+                        return_logits=True,
+                        return_embeddings=True,
+                    )
+                )
+                self.model_opt_report = _check_kit_status()
+
+    def _autocast(self, torch: Any) -> Any:
+        """bf16 autocast on the model_opt path on GPU (the kit's stock call);
+        a no-op everywhere else, so the transformers path is unchanged."""
+        if self._client is not None and str(self._device).startswith("cuda"):
+            return torch.autocast("cuda", dtype=torch.bfloat16)
+        return contextlib.nullcontext()
 
     def predict(self, request: BaseRequest) -> BaseResponse:
         if not isinstance(request, ProteinLanguageRequest):
@@ -124,7 +264,14 @@ class ESMCBackend(ModelBackend):
         target_device = (
             self._model.device if self._device_map is not None else self._device
         )
-        inputs = {k: v.to(target_device) for k, v in inputs.items()}
+        if self._client is not None:
+            # model_opt path: exactly the kit's stock batched call — input_ids
+            # + attention_mask only, bf16 autocast on GPU.
+            inputs = {
+                k: inputs[k].to(target_device) for k in ("input_ids", "attention_mask")
+            }
+        else:
+            inputs = {k: v.to(target_device) for k, v in inputs.items()}
         attention_mask = inputs["attention_mask"]  # (N, L)
         seq_lens: list[int] = attention_mask.sum(dim=1).cpu().int().tolist()
 
@@ -132,7 +279,7 @@ class ESMCBackend(ModelBackend):
         # .last_hidden_state — so requesting embeddings forces the hidden-states
         # flag on the underlying model call.
         need_hidden = request.return_embeddings or request.output_hidden_states
-        with torch.inference_mode():
+        with torch.inference_mode(), self._autocast(torch):
             output = self._model(
                 **inputs,
                 output_hidden_states=need_hidden,
@@ -181,3 +328,45 @@ class ESMCBackend(ModelBackend):
             vocab_size=vocab_size,
             hidden_dim=hidden_dim,
         )
+
+
+def _enable_kit(mode: str, variant: str) -> dict[str, Any]:
+    """``esmc_opt.enable(mode, strict=True)`` → report, or NOT ACTIVE error."""
+    try:
+        import esmc_opt  # ty: ignore[unresolved-import]
+    except ImportError as e:
+        raise ModelOptNotActiveError(
+            f"[{_KIT_TAG}] NOT ACTIVE: the esmc_opt package is not installed "
+            f"({e}).  Install the ESM C kit (pip install -e esmc/opt from the "
+            "pinned kits tree); see docs/concepts/model_opt.md."
+        ) from e
+    try:
+        # Sheaf always runs the caller's padded batched forward, so the
+        # regime is "batched" even for one-sequence requests.
+        return esmc_opt.enable(mode, variant=variant, regime="batched", strict=True)
+    except esmc_opt.ActivationError as e:
+        raise ModelOptNotActiveError(f"[{_KIT_TAG}] NOT ACTIVE: {e}") from e
+
+
+def _check_kit_status() -> dict[str, Any]:
+    """After the warm-up forward: the kit must report every lever applied."""
+    import esmc_opt  # ty: ignore[unresolved-import]
+
+    report = esmc_opt.status()
+    fallback = report.get("levers_fallback") or []
+    if not report.get("active") or fallback:
+        raise ModelOptNotActiveError(
+            f"[{_KIT_TAG}] NOT ACTIVE: mode={report.get('mode')} "
+            f"levers_fallback={fallback} reason={report.get('reason')}"
+        )
+    return report
+
+
+def _is_kit_refusal(exc: BaseException) -> bool:
+    """True for the kit's own ActivationError family (esmc_opt or its stack)."""
+    for mod_name in ("esmc_opt", "esmc_opt.stack"):
+        mod = sys.modules.get(mod_name)
+        err = getattr(mod, "ActivationError", None) if mod is not None else None
+        if isinstance(err, type) and isinstance(exc, err):
+            return True
+    return False
