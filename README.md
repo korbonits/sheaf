@@ -337,6 +337,15 @@ Biohub's "world model of protein biology" landed 2026-05-27 under MIT.  Sheaf in
 - [x] End-to-end GPU smoke — `examples/quickstart_protein_modal.py` runs `ESMFold2Backend` on H100 via Modal (~70s cold start to a persistent volume, sub-second per fold). 53-residue target → 43,088-char mmCIF, pTM=0.2465.
 - [ ] Forge / Biohub-Platform HTTP-client variants for the ESMC 300M / 600M / ESMFold2-fast API-only models.
 
+**v0.12 — inference optimization kits**
+
+Anthropic's [biomolecular inference optimization kits](https://github.com/anthropics/uplifting-biomolecular-modeling) (Apache-2.0) as an opt-in per deployment.  See [`docs/concepts/model_opt.md`](docs/concepts/model_opt.md).
+
+- [x] `ModelSpec.model_opt = ModelOptConfig(mode=...)` across Ray Serve, Modal, `BatchRunner` and `SheafWorker`; default `None` leaves every backend unchanged.
+- [x] ESM C `off` / `exact`: `exact` bitwise identical to `off` on ESMC-6B, 2.5–2.9× faster forward at batch 1 on H100 ([results](bench/results/2026-09-24-esmc-kit-h100-6b/README.md)).
+- [x] Fix: `/predict` and `/stream` returned 422 with FastAPI ≥ 0.137.
+- [ ] ESMFold2 `exact` / `fast`.
+
 ---
 
 ## Architecture
