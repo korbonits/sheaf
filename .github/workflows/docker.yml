@@ -57,16 +57,19 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Building image for sheaf-serve==${VERSION}"
 
-      # PyPI's JSON API can lag a minute or two behind a fresh upload (CDN
-      # cache).  Poll until the version is queryable so the docker build's
-      # pip install doesn't race the publish.yml workflow.  Skipped on
+      # PyPI's CDN can lag a minute or two behind a fresh upload, and the JSON
+      # API and the /simple/ index (what uv and pip resolve from) update
+      # separately.  Poll the simple index so the docker build's install
+      # doesn't race the publish.yml workflow.  Skipped on
       # PR / dispatch — the version we read from pyproject.toml is whatever
       # is currently on main, already propagated.
       - name: Wait for sheaf-serve on PyPI
         if: github.event_name == 'push'
         run: |
           for i in $(seq 1 30); do
-            if curl -sf "https://pypi.org/pypi/sheaf-serve/${SHEAF_VERSION}/json" > /dev/null; then
+            if curl -sf -H "Accept: application/vnd.pypi.simple.v1+json" \
+                https://pypi.org/simple/sheaf-serve/ \
+                | jq -e --arg v "$SHEAF_VERSION" '.versions | index($v)' > /dev/null; then
               echo "sheaf-serve==${SHEAF_VERSION} is on PyPI"
               exit 0
             fi
