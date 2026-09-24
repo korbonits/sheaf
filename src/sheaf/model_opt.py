@@ -212,25 +212,45 @@ def configure_levers_off(model_opt: ModelOptConfig) -> None:
 
 
 class _Tee(io.TextIOBase):
-    """Writes through to ``inner`` and buffers lines for later inspection."""
+    """Writes through to ``inner`` and buffers lines for later inspection.
+
+    Code run inside the capture window (e.g. a logging handler created by a
+    first import) can keep a reference to the tee past the block, so after
+    :meth:`drain` it is a plain pass-through and stream introspection goes to
+    ``inner``.
+    """
 
     def __init__(self, inner: Any) -> None:
         self._inner = inner
         self._buf = ""
+        self._capturing = True
         self.lines: list[str] = []
 
     def write(self, s: str) -> int:
         self._inner.write(s)
-        self._buf += s
-        while "\n" in self._buf:
-            line, self._buf = self._buf.split("\n", 1)
-            self.lines.append(line)
+        if self._capturing:
+            self._buf += s
+            while "\n" in self._buf:
+                line, self._buf = self._buf.split("\n", 1)
+                self.lines.append(line)
         return len(s)
 
     def flush(self) -> None:
         self._inner.flush()
 
+    def fileno(self) -> int:
+        return self._inner.fileno()
+
+    def isatty(self) -> bool:
+        return self._inner.isatty()
+
+    @property
+    def encoding(self) -> str:
+        return getattr(self._inner, "encoding", "utf-8")
+
     def drain(self) -> None:
+        """Stop capturing and flush any partial line into ``lines``."""
+        self._capturing = False
         if self._buf:
             self.lines.append(self._buf)
             self._buf = ""

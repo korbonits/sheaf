@@ -5,6 +5,7 @@ No GPU, torch or kit required: every kit interaction is faked.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import sys
@@ -261,3 +262,23 @@ def test_capture_collects_lines_even_when_block_raises() -> None:
             print("[esmc-opt] NOT ACTIVE: no visible GPU")
             raise RuntimeError("boom")
     assert sink == ["[esmc-opt] NOT ACTIVE: no visible GPU"]
+
+
+def test_capture_stops_buffering_for_streams_kept_past_the_block(capsys) -> None:
+    # A handler created inside the window keeps the tee after the block exits.
+    with capture_kit_lines("esmc-opt", "dep") as lines:
+        kept = sys.stderr
+        kept.write("[esmc-opt] ACTIVE mode=exact\n")
+    kept.write("[esmc-opt] later line from a lingering handler\n")
+    assert lines == ["[esmc-opt] ACTIVE mode=exact"]
+    assert kept.lines == ["[esmc-opt] ACTIVE mode=exact"]  # ty: ignore[unresolved-attribute]
+    assert "lingering handler" in capsys.readouterr().err
+
+
+def test_capture_forwards_stream_introspection() -> None:
+    real = sys.__stderr__
+    assert real is not None
+    with contextlib.redirect_stderr(real), capture_kit_lines("esmc-opt", "dep"):
+        assert sys.stderr.fileno() == real.fileno()
+        assert sys.stderr.isatty() == real.isatty()
+        assert sys.stderr.encoding == real.encoding
