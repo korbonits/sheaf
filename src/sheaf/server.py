@@ -1,7 +1,5 @@
 """ModelServer — the Ray Serve entry point for Sheaf."""
 
-from __future__ import annotations
-
 import importlib
 import json
 import logging

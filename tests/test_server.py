@@ -316,3 +316,17 @@ def test_build_app_top_level_export() -> None:
     from sheaf.server import build_app as server_build_app
 
     assert sheaf.build_app is server_build_app
+
+
+@pytest.mark.parametrize("route", ["predict", "stream"])
+def test_ingress_body_annotations_are_not_strings(route: str) -> None:
+    # Ray Serve cloudpickles the ingress class, dropping module globals that
+    # only annotations reference.  FastAPI >= 0.137 then can't resolve a
+    # string annotation and reads the body param as a required query param.
+    import inspect
+
+    from sheaf.server import _SheafDeployment
+
+    cls = _SheafDeployment.func_or_class
+    annotation = inspect.signature(getattr(cls, route)).parameters["request"].annotation
+    assert not isinstance(annotation, str)

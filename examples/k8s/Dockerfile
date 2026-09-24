@@ -14,7 +14,10 @@
 
 FROM ghcr.io/korbonits/sheaf-serve:v0.10.0
 
-RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.10.0'
+# sheaf-serve <= 0.11.0 declares its ingress routes with string annotations,
+# which FastAPI >= 0.137 misreads as query params (every predict -> 422).
+# Drop the cap when bumping past 0.11.0.
+RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.10.0' 'fastapi<0.137'
 
 # /workspace is the base image's WORKDIR.  Ray Serve's import_path
 # resolution does importlib.import_module("app"), which finds app.py on
