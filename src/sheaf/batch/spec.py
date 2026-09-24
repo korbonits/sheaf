@@ -16,6 +16,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from sheaf.api.base import ModelType
+from sheaf.model_opt import ModelOptConfig
 
 
 class BatchSource(BaseModel):
@@ -125,6 +126,15 @@ class BatchSpec(BaseModel):
         ),
     )
 
+    model_opt: ModelOptConfig | None = Field(
+        default=None,
+        description=(
+            "Inference optimization kit mode, as on ModelSpec.model_opt.  "
+            "Requires compute='actors': kits patch the whole worker process, "
+            "and task-mode workers are reused across specs."
+        ),
+    )
+
     @model_validator(mode="after")
     def _validate_compute_config(self) -> BatchSpec:
         if self.compute == "actors" and self.num_actors is None:
@@ -132,5 +142,12 @@ class BatchSpec(BaseModel):
                 "num_actors is required when compute='actors'.  Set "
                 "num_actors=N to size the pool (e.g. num_actors=2 with "
                 "num_gpus=1 reserves 2 GPUs)."
+            )
+        if self.model_opt is not None and self.compute != "actors":
+            raise ValueError(
+                "model_opt requires compute='actors': inference optimization "
+                "kits patch the whole worker process, and compute='tasks' "
+                "reuses worker processes (and their backend cache) across "
+                "specs.  Set compute='actors' and num_actors=N."
             )
         return self

@@ -54,6 +54,7 @@ from sheaf.metrics import (
     register_metrics_endpoint,
     time_load,
 )
+from sheaf.model_opt import apply_model_opt
 from sheaf.registry import _BACKEND_REGISTRY, register_backend  # noqa: F401
 from sheaf.scheduling.batch import bucket_requests
 from sheaf.spec import ModelSpec
@@ -134,6 +135,9 @@ class _SheafDeployment:
         configure_tracing()
 
         self._backend: ModelBackend = backend_cls(**spec.backend_kwargs)
+        # Kit modes are validated + handed over before load(): a refusal
+        # raises here, so the deployment fails at startup, not at request 1.
+        apply_model_opt(self._backend, spec.model_opt, spec.name)
         with time_load(spec.name, spec.model_type):
             self._backend.load()
         self._spec = spec

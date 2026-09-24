@@ -9,6 +9,7 @@ from sheaf.api.base import BaseRequest, BaseResponse
 
 if TYPE_CHECKING:
     from sheaf.lora import LoRAAdapter
+    from sheaf.model_opt import ModelOptConfig
 
 
 class ModelBackend(ABC):
@@ -80,6 +81,27 @@ class ModelBackend(ABC):
     def model_type(self) -> str:
         """The ModelType this backend serves."""
         ...
+
+    # ------------------------------------------------------------------
+    # Inference optimization kits — opt-in (sheaf.model_opt)
+    # ------------------------------------------------------------------
+
+    def supported_opt_modes(self) -> frozenset[str]:
+        """Kit modes this backend can run under ``ModelSpec.model_opt``.
+
+        Default: none.  Backends wrapping a model that has an inference
+        optimization kit override this and read the config handed to
+        :meth:`configure_model_opt` inside ``load()``.
+        """
+        return frozenset()
+
+    def configure_model_opt(self, model_opt: "ModelOptConfig") -> None:
+        """Receive the deployment's ``ModelOptConfig`` before ``load()``.
+
+        Called by :func:`sheaf.model_opt.apply_model_opt` only after the mode
+        has been checked against :meth:`supported_opt_modes`.
+        """
+        self._model_opt = model_opt
 
     # ------------------------------------------------------------------
     # LoRA adapter multiplexing — opt-in

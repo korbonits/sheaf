@@ -78,6 +78,7 @@ from sheaf.cache import _DISABLED as _CACHE_DISABLED
 from sheaf.cache import ResponseCache
 from sheaf.lora import resolve_active_adapters
 from sheaf.metrics import record_predict, register_metrics_endpoint, time_load
+from sheaf.model_opt import apply_model_opt
 from sheaf.spec import ModelSpec
 from sheaf.tracing import configure_tracing, record_exception, trace_predict, trace_span
 
@@ -117,6 +118,25 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _check_model_opt_isolation(specs: list[ModelSpec]) -> None:
+    """Reject a kit-mode spec that would share its container with another spec.
+
+    Every spec of a ``ModalServer`` loads in one container process, and the
+    inference optimization kits patch the interpreter process-wide
+    (``sheaf.model_opt``): a second spec of the same model family would
+    silently run under the first spec's mode.  A spec with ``model_opt`` set
+    must therefore be the only spec of its ``ModalServer``.
+    """
+    opt_specs = [s.name for s in specs if s.model_opt is not None]
+    if opt_specs and len(specs) > 1:
+        raise ValueError(
+            f"ModelSpec(s) {opt_specs} set model_opt but share a ModalServer "
+            f"with {len(specs) - 1} other spec(s).  Inference optimization "
+            "kits patch the whole container process; serve each model_opt "
+            "spec from its own ModalServer (one app per mode)."
+        )
+
+
 def _build_asgi_app(specs: list[ModelSpec], *, load_backends: bool = True) -> Any:
     """Build a FastAPI ASGI app that serves all specs.
 
@@ -136,6 +156,8 @@ def _build_asgi_app(specs: list[ModelSpec], *, load_backends: bool = True) -> An
     import os as _os
 
     from fastapi import FastAPI, HTTPException
+
+    _check_model_opt_isolation(specs)
 
     # Populate the backend registry (same pattern as _SheafDeployment.__init__).
     # Imports are lightweight — heavy deps stay lazy inside each backend's load().
@@ -187,6 +209,7 @@ def _build_asgi_app(specs: list[ModelSpec], *, load_backends: bool = True) -> An
                 f"Registered backends: {list(_BACKEND_REGISTRY)}"
             )
         backend = backend_cls(**spec.backend_kwargs)
+        apply_model_opt(backend, spec.model_opt, spec.name)
         if load_backends:
             with time_load(spec.name, spec.model_type):
                 backend.load()
@@ -507,6 +530,7 @@ class ModalServer:
                 "modal is required for ModalServer. Install it with: pip install modal"
             ) from e
 
+        _check_model_opt_isolation(models)
         self._models = models
 
         _image = image or (
