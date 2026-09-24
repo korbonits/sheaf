@@ -39,10 +39,11 @@ VARIANT = os.environ.get("SHEAF_ESMC_VARIANT", "6b")
 GPU = os.environ.get("SHEAF_BENCH_GPU", "H100")
 MINUTES = 60
 
-_REPO = Path(__file__).resolve().parents[2]
 _WEIGHTS = "/weights"
 _JIT = "/jit"
 _SHEAF = "/root/sheaf"
+# Modal imports this file as /root/modal_esmc.py in the container.
+_REPO = Path(__file__).resolve().parents[2] if modal.is_local() else Path(_SHEAF)
 
 
 def _git_sha() -> str:
