@@ -114,9 +114,48 @@ image = (
 _volumes = {_WEIGHTS: weights_vol, _JIT: jit_vol}
 
 
+def _fetch_pinned_snapshot(variant: str) -> None:
+    """Download the kit's pinned snapshot by commit and point refs/main at it.
+
+    The kit's downloader fetches the repo's default revision and refuses when
+    upstream has re-published since the pin (biohub/ESMC-6B was re-sharded on
+    2026-09-14).  With the pinned files already in place, ``run.sh install``
+    skips its download and only runs its sha256 check.  refs/main must name
+    the pinned commit because offline loads resolve through it.
+    """
+    import json
+
+    os.environ["HF_HUB_OFFLINE"] = "0"  # read when huggingface_hub is imported
+    from huggingface_hub import scan_cache_dir, snapshot_download
+
+    pins = json.loads(Path("/kits/esmc/stock/PINS.json").read_text())
+    repo = pins["variants"][variant]["hf_repo"]
+    commit = pins["weights"][repo]["snapshot_commit"]
+    cache = f"{_WEIGHTS}/esmc/hf/hub"
+    snapshot_download(
+        repo,
+        revision=commit,
+        cache_dir=cache,
+        allow_patterns=["*.json", "*.safetensors"],
+    )
+    ref = Path(cache) / f"models--{repo.replace('/', '--')}" / "refs" / "main"
+    ref.write_text(commit)
+    info = scan_cache_dir(cache)
+    stale = [
+        rev.commit_hash
+        for cached in info.repos
+        if cached.repo_id == repo
+        for rev in cached.revisions
+        if rev.commit_hash != commit
+    ]
+    if stale:
+        info.delete_revisions(*stale).execute()
+
+
 @app.function(image=image, volumes=_volumes, timeout=60 * MINUTES)
 def fetch_weights(variant: str = VARIANT) -> None:
     """Fetch the kit's pinned snapshot and sha256-check every file."""
+    _fetch_pinned_snapshot(variant)
     subprocess.run(
         [
             "bash",
