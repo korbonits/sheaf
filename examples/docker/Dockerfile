@@ -30,7 +30,10 @@ FROM ghcr.io/korbonits/sheaf-serve:v0.10.0
 
 # Add the backend extras your deployment actually needs.  Multiple extras
 # in a single bracket expression keep the install in one resolver pass.
-RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.10.0'
+# sheaf-serve <= 0.11.0 declares its ingress routes with string annotations,
+# which FastAPI >= 0.137 misreads as query params (every predict -> 422).
+# Drop the cap when bumping past 0.11.0.
+RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.10.0' 'fastapi<0.137'
 
 # Copy the server script that calls ModelServer.run().  /workspace is the
 # image's WORKDIR, so this lands at /workspace/server.py.
