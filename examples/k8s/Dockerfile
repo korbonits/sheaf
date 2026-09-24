@@ -7,17 +7,14 @@
 # Build & push to your registry (build context must be this directory so
 # `COPY app.py .` resolves):
 #     cd examples/k8s
-#     docker build -t YOUR_REGISTRY/sheaf-chronos:v0.10.0 .
-#     docker push YOUR_REGISTRY/sheaf-chronos:v0.10.0
+#     docker build -t YOUR_REGISTRY/sheaf-chronos:v0.12.0 .
+#     docker push YOUR_REGISTRY/sheaf-chronos:v0.12.0
 #
 # Then update the image: field in rayservice.yaml to match.
 
-FROM ghcr.io/korbonits/sheaf-serve:v0.10.0
+FROM ghcr.io/korbonits/sheaf-serve:v0.12.0
 
-# sheaf-serve <= 0.11.0 declares its ingress routes with string annotations,
-# which FastAPI >= 0.137 misreads as query params (every predict -> 422).
-# Drop the cap when bumping past 0.11.0.
-RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.10.0' 'fastapi<0.137'
+RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.12.0'
 
 # /workspace is the base image's WORKDIR.  Ray Serve's import_path
 # resolution does importlib.import_module("app"), which finds app.py on
