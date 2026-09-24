@@ -178,7 +178,7 @@ def gpu_test() -> str:
     env = dict(os.environ, SHEAF_GPU_KIT_TEST="1", MODEL_OPT_JIT_ROOT=_JIT)
     env["SHEAF_GPU_KIT_ESMC_MODEL"] = f"esmc_{VARIANT}"
     proc = subprocess.run(
-        ["python", "-m", "pytest", "-v", "tests/test_gpu_model_opt_esmc.py"],
+        ["python", "-m", "pytest", "-v", "-rP", "tests/test_gpu_model_opt_esmc.py"],
         cwd=_SHEAF,
         env=env,
         capture_output=True,

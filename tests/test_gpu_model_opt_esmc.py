@@ -49,6 +49,7 @@ def _dump(mode: str, out: Path) -> str:
 def test_exact_is_bitwise_identical_to_off(tmp_path: Path) -> None:
     off_log = _dump("off", tmp_path / "off.npz")
     exact_log = _dump("exact", tmp_path / "exact.npz")
+    print(f"--- off ---\n{off_log}\n--- exact ---\n{exact_log}")
 
     assert "[esmc-opt]" not in off_log, "the kit engaged under mode=off"
     assert "[esmc-opt] ACTIVE mode=exact" in exact_log
