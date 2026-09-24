@@ -9,7 +9,7 @@ that come with them.
 | | |
 |---|---|
 | Upstream | https://github.com/anthropics/uplifting-biomolecular-modeling |
-| Status upstream | archived reference release; not maintained, no PRs |
+| Status upstream | reference release; not maintained, no PRs (not archived on GitHub) |
 | Licence | Apache-2.0 (the kits' original code); each kit's `stock/` is the upstream project under its own licence (see the tree's `NOTICE` and each kit's `THIRD_PARTY_NOTICES.md`) |
 | Copyright | Copyright 2026 Anthropic, PBC |
 | Pinned commit | `f4f62fa6592ae4938d49b1757bea0cfeff9f468e` (2026-09-17) |
