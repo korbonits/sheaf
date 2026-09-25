@@ -114,6 +114,11 @@ instead:
 - **Modal:** `bench/model_opt/modal_esmc.py` mirrors the kit's Dockerfile as a
   Modal image.
 
+To try the kit on Modal without Sheaf, see
+[`esmc_kit_exact.py`](https://github.com/korbonits/modal-examples/blob/9478f78d4df4cafb28c5e6fa7c7315fe354653d4/misc/esmc_kit_exact.py).
+It is a single-file example that builds the same image, runs `off` and `exact`
+in separate containers, compares their outputs byte for byte, and times both.
+
 Weights are the kit's pinned Hugging Face snapshot. Fetch them once with
 `run.sh install --weights DIR --variant 6b` (`modal run
 bench/model_opt/modal_esmc.py::fetch_weights`), then serve with
