@@ -344,6 +344,7 @@ Anthropic's [biomolecular inference optimization kits](https://github.com/anthro
 - [x] `ModelSpec.model_opt = ModelOptConfig(mode=...)` across Ray Serve, Modal, `BatchRunner` and `SheafWorker`; default `None` leaves every backend unchanged.
 - [x] ESM C `off` / `exact`: `exact` bitwise identical to `off` on ESMC-6B, 2.5–2.9× faster forward at batch 1 on H100 ([results](bench/results/2026-09-24-esmc-kit-h100-6b/README.md)).
 - [x] Fix: `/predict` and `/stream` returned 422 with FastAPI ≥ 0.137.
+- [x] 0.12.1: require `ray[serve]>=2.57` (older Ray can't serialize the ingress app with FastAPI ≥ 0.141) and declare `jinja2`, which Ray Serve 2.57+ imports without declaring.
 - [ ] ESMFold2 `exact` / `fast`.
 
 ---
