@@ -41,6 +41,7 @@ one variant per process.  See ``docs/concepts/model_opt.md``.  With
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from sheaf.api.base import BaseRequest, BaseResponse, ModelType
@@ -190,6 +191,16 @@ class ESMFold2Backend(ModelBackend):
         if mode != "off":
             configure_jit_env(model_opt, stack_key())
             configure_levers_off(model_opt)
+            # What the kit's configs/<card>.env export: refuse rather than run
+            # without flash-attention / Transformer Engine, and keep the
+            # weights-digest memo beside the compile cache so a restart does
+            # not re-hash ~24 GiB.
+            os.environ.setdefault("ESMFOLD2_OPT_REQUIRE_FAST_ENV", "1")
+            if model_opt.jit_root:
+                os.environ.setdefault(
+                    "ESMFOLD2_OPT_WEIGHTS_MEMO_DIR",
+                    os.path.join(model_opt.jit_root, "weights"),
+                )
             with capture_kit_lines(_KIT_TAG, owner, self.model_opt_lines):
                 self.model_opt_report = _enable_kit(mode, variant)
 

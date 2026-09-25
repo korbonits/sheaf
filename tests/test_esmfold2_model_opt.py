@@ -307,6 +307,23 @@ def test_kit_not_installed_raises_not_active() -> None:
             backend.load()
 
 
+def test_kit_env_mirrors_the_kits_config(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("ESMFOLD2_OPT_REQUIRE_FAST_ENV", raising=False)
+    monkeypatch.delenv("ESMFOLD2_OPT_WEIGHTS_MEMO_DIR", raising=False)
+    for var in (
+        "TRITON_CACHE_DIR",
+        "TORCH_EXTENSIONS_DIR",
+        "MODEL_OPT_JIT_ROOT",
+        "MODEL_OPT_STACK_KEY",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    events: list[str] = []
+    backend = _backend("exact", jit_root=str(tmp_path))
+    _load(backend, events, _FakeKit(events))
+    assert os.environ["ESMFOLD2_OPT_REQUIRE_FAST_ENV"] == "1"
+    assert os.environ["ESMFOLD2_OPT_WEIGHTS_MEMO_DIR"] == str(tmp_path / "weights")
+
+
 def test_levers_off_are_exported(monkeypatch) -> None:
     monkeypatch.delenv("MODEL_OPT_LEVERS_OFF", raising=False)
     events: list[str] = []
