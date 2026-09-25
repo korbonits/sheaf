@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.12.0 shipped (opt-in inference optimization kits via `ModelSpec.model_opt` — ESM C `off`/`exact`, validated bitwise on H100; FastAPI ≥ 0.137 ingress fix)
+## Current state: v0.12.1 shipped (opt-in inference optimization kits via `ModelSpec.model_opt` — ESM C `off`/`exact`, validated bitwise on H100; FastAPI ≥ 0.137 ingress fix; 0.12.1: `ray[serve]>=2.57` + explicit `jinja2`)
 
 Per-version ship notes live in git history and release tags. This doc tracks what exists *now* and the non-obvious design choices behind it. For feature-level changelog, see `git log`.
 
