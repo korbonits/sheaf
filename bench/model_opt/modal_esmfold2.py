@@ -118,6 +118,13 @@ image = (
     )
     .run_function(_build_wheels, cpu=32.0, memory=128 * 1024, timeout=180 * MINUTES)
     .run_commands(f"cd {_KIT} && bash run.sh install")
+    # The GPU test's runner, which the kit's lock does not carry; --no-deps so
+    # nothing pinned moves, then the kit's install re-runs its pin check.
+    .run_commands(
+        "python -m pip install --no-cache-dir --no-deps"
+        " pytest==9.1.1 iniconfig==2.3.0 pluggy==1.6.0",
+        f"cd {_KIT} && bash run.sh install",
+    )
     .env(
         {
             "PYTHONPATH": f"{_SHEAF}/src:{_SHEAF}",
