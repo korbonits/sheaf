@@ -7,14 +7,14 @@
 # Build & push to your registry (build context must be this directory so
 # `COPY app.py .` resolves):
 #     cd examples/k8s
-#     docker build -t YOUR_REGISTRY/sheaf-chronos:v0.12.0 .
-#     docker push YOUR_REGISTRY/sheaf-chronos:v0.12.0
+#     docker build -t YOUR_REGISTRY/sheaf-chronos:v0.12.1 .
+#     docker push YOUR_REGISTRY/sheaf-chronos:v0.12.1
 #
 # Then update the image: field in rayservice.yaml to match.
 
-FROM ghcr.io/korbonits/sheaf-serve:v0.12.0
+FROM ghcr.io/korbonits/sheaf-serve:v0.12.1
 
-RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.12.0'
+RUN pip install --no-cache-dir 'sheaf-serve[time-series]==0.12.1'
 
 # /workspace is the base image's WORKDIR.  Ray Serve's import_path
 # resolution does importlib.import_module("app"), which finds app.py on
