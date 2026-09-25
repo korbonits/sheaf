@@ -139,6 +139,7 @@ def _fetch_pinned_snapshot(variant: str) -> None:
         allow_patterns=["*.json", "*.safetensors"],
     )
     ref = Path(cache) / f"models--{repo.replace('/', '--')}" / "refs" / "main"
+    ref.parent.mkdir(exist_ok=True)  # snapshot_download(revision=<sha>) writes no refs/
     ref.write_text(commit)
     info = scan_cache_dir(cache)
     stale = [
