@@ -8,7 +8,7 @@ Each model type gets a typed request/response contract (Pydantic). Batching, cac
 
 PyPI: `pip install sheaf-serve`
 
-## Current state: v0.12.1 shipped (opt-in inference optimization kits via `ModelSpec.model_opt` — ESM C `off`/`exact`, validated bitwise on H100; FastAPI ≥ 0.137 ingress fix; 0.12.1: `ray[serve]>=2.57` + explicit `jinja2`)
+## Current state: v0.13.0 shipped (opt-in inference optimization kits via `ModelSpec.model_opt` — ESM C `off`/`exact` and ESMFold2 `off`/`exact`/`fast`, validated on H100; `biohub/ESMFold2-Fast` served on the kit path)
 
 Per-version ship notes live in git history and release tags. This doc tracks what exists *now* and the non-obvious design choices behind it. For feature-level changelog, see `git log`.
 
@@ -22,7 +22,7 @@ Per-version ship notes live in git history and release tags. This doc tracks wha
 - **Caching** — opt-in per deployment via `ModelSpec.cache = CacheConfig(...)`; in-process LRU, SHA-256 key, optional TTL. `SHEAF_CACHE_DISABLED=1` disables process-wide.
 - **Feast integration** — `FeatureRef` on `TimeSeriesRequest`; `FeastResolver` wraps `feast.FeatureStore` and resolves online features per-request before batching/cache.
 - **Ops/DX** — structured JSON logging (`SHEAF_LOG_JSON=1`), Prometheus metrics, OTel tracing (`sheaf.predict` → `sheaf.feast.resolve` + `sheaf.backend.infer`), SSE streaming.
-- **Inference optimization kits (opt-in)** — `ModelSpec.model_opt = ModelOptConfig(mode=...)` engages Anthropic's biomolecular kits (`sheaf.model_opt`); ESMC supports `off` / `exact` today. Default `None` = pre-existing code path, nothing of any kit imported. See `docs/concepts/model_opt.md`.
+- **Inference optimization kits (opt-in)** — `ModelSpec.model_opt = ModelOptConfig(mode=...)` engages Anthropic's biomolecular kits (`sheaf.model_opt`); ESMC supports `off` / `exact`, ESMFold2 `off` / `exact` / `fast`. Default `None` = pre-existing code path, nothing of any kit imported. See `docs/concepts/model_opt.md`.
 - **Backend plugin model** — `@register_backend("name")` self-registration; or pass a class directly via `ModelSpec.backend_cls` (cloudpickled); or `SHEAF_EXTRA_BACKENDS=module1,module2` for worker-side discovery.
 
 ### Supported model types
