@@ -6,7 +6,7 @@ from __future__ import annotations
 from sheaf.modal_server import ModalServer
 from sheaf.spec import ModelSpec
 
-__version__ = "0.12.1"
+__version__ = "0.13.0"
 __all__ = ["ModalServer", "ModelServer", "ModelSpec", "build_app"]
 
 
