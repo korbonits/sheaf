@@ -39,13 +39,15 @@ One vocabulary across all kits; each backend accepts the subset its kit ships.
 | backend | kit | modes | notes |
 |---|---|---|---|
 | `esmc` | `esmc` (ESM C, `esm` 3.4.0) | `off`, `exact` | 300M / 600M / 6B |
+| `esmfold2` | `esmfold2` (ESMFold2, `esm` 3.3.0) | `off`, `exact`, `fast` | `biohub/ESMFold2` (kit variant `full_nomsa`), `biohub/ESMFold2-Fast` (`fast`) |
 
 `ModelOptConfig` fields:
 
 - `mode` — as above. An unsupported mode is rejected at deploy time.
 - `jit_root` — persistent compile-cache root (see below).
-- `levers_off` — switch named optimizations off (`MODEL_OPT_LEVERS_OFF`).
-  The ESM C kit has no such switch, so it must stay empty there.
+- `levers_off` — switch named optimizations off (`MODEL_OPT_LEVERS_OFF`;
+  names as on the kit's `LEVER` lines). The ESMFold2 kit accepts it; the ESM C
+  kit has no such switch, so it must stay empty there.
 
 ### What `off` means for ESMC
 
@@ -57,6 +59,21 @@ it for the same inputs and batch composition. With `model_opt=None` the
 backend keeps its original `transformers.AutoModelForMaskedLM` path, which is
 a different numerical configuration. Compare `exact` with `off`, never with
 `None`.
+
+### What `off` means for ESMFold2
+
+`off` is the library's fused backend with pair-block chunking off
+(`set_kernel_backend("fused")` + `set_chunk_size(None)`, the kit's
+`--backend fused`). That is the configuration `exact` reproduces, bit for bit
+under the kit's deterministic recipe: `CUBLAS_WORKSPACE_CONFIG=:4096:8` set
+before torch is imported, `torch.use_deterministic_algorithms(True,
+warn_only=True)`, and a seeded request. Without the recipe, stock itself is not
+run-to-run reproducible, so neither is `exact`. `fast` stays within stock's
+seed-to-seed variation and is not bitwise. With `model_opt=None` the backend
+runs the model as `from_pretrained` loads it, on Sheaf's `[protein]` pins.
+
+The kit runs one variant per process (`biohub/ESMFold2` → `full_nomsa`,
+`biohub/ESMFold2-Fast` → `fast`), and Sheaf enforces that alongside the mode.
 
 ## Startup contract
 
@@ -72,6 +89,13 @@ The kit's own lines, `[esmc-opt] ACTIVE mode=exact …` and
 re-logged through the `sheaf.model_opt` logger (JSON with
 `SHEAF_LOG_JSON=1`, with `kit` and `deployment` fields). They are also kept on
 the backend as `backend.model_opt_lines`.
+
+For ESMFold2 the kit applies its optimizations to the loaded model at load
+(`esmfold2_opt.stack.apply_to`) and the check is its `partial` list: a lever of
+the mode left unapplied refuses the deployment. When flash-attention or
+Transformer Engine is not live, the kit exits the process (code 3); Sheaf turns
+that into `ModelOptNotActiveError` too, so a Ray replica fails its startup
+instead of dying.
 
 Sheaf does not use the kits' `<KIT>_OPT` environment variables. That route
 `os._exit(3)`s the interpreter on refusal, which reaches Ray only as an
@@ -123,6 +147,19 @@ Weights are the kit's pinned Hugging Face snapshot. Fetch them once with
 `run.sh install --weights DIR --variant 6b` (`modal run
 bench/model_opt/modal_esmc.py::fetch_weights`), then serve with
 `HF_HOME=DIR/hf HF_HUB_OFFLINE=1`.
+
+The ESMFold2 kit has its own stack, which cannot share an environment with
+ESM C's: Python 3.12, CUDA 13.0, torch 2.13.0+cu130, triton 3.7.1, `esm` 3.3.0
+@ `26b0bc2b`, flash-attn 2.8.3.post1, Transformer Engine 2.15.0, xformers
+0.0.35, plus the kits' shared core (`common/opt_core`). No index carries the
+three CUDA extensions for this torch, so the image compiles them (the kit's
+`environment/build_wheels.sh`, about 16 minutes on 24 cores).
+`bench/model_opt/modal_esmfold2.py` builds that image on Modal (the extension
+step gets 32 CPUs), fetches the three pinned snapshots (`biohub/ESMFold2`,
+`biohub/ESMFold2-Fast`, `biohub/ESMC-6B`, ~27 GB) with the kit's installer, and
+runs the GPU test and the benchmark. With `jit_root` set, Sheaf also points
+the kit's weights-digest memo at `<jit_root>/weights`, so a restart does not
+re-hash the checkpoints.
 
 ## Compile cache
 

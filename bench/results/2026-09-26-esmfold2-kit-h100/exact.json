@@ -1,0 +1,153 @@
+{
+ "mode": "exact",
+ "model": "biohub/ESMFold2",
+ "load_s": 51.291920310999984,
+ "kit_lines": [
+  "[esmfold2-opt] WEIGHTS pinned sha256: 14 file(s) for variant full_nomsa (config.json=c5566fab6a17, model-00001-of-00006.safetensors=bd90149ff223, model-00002-of-00006.safetensors=f75e2144d826, model-00003-of-00006.safetensors=f699f01ecc96, +10 more); 14 (cached digest 2026-09-25T06:01:18Z)",
+  "[esmfold2-opt] ACTIVE mode=exact variant=full_nomsa server_mode=opt7x esm=3.3.0 transformers=4.57.6 gpu=NVIDIA H100 80GB HBM3(sm90) n_gpu=1 sharding=none levers=fused,t6,t3,t5,ax,fz,tg,sg,eg,ec,fc,pb,ls,xtr,xte,trimul,glue,disto,xln,ro fallbacks=none applied=deferred atom_attn=flash_attn esmc_mlp=te esmc_attn=sdpa(chain_mask) esmc_rope=flash_attn_triton flash_attn=2.8.3.post1 transformer_engine=2.15.0+42b8400 xformers=0.0.35+03b91d7.d20260904 compile=n/a graph_lru_sampler=2 graph_budgets=800/800/1536",
+  "[esmfold2-opt] APPLIED model#0 msa_encoder mode=exact variant=full_nomsa server_mode=opt7x levers=fused,t6,t3,t5,ax,fz,tg,sg,eg,ec,fc,pb,ls,xtr,xte,trimul,glue,disto,xln,ro fallbacks=none substituted=none not_for_variant=rg,mh atom_attn=flash_attn atom_forward=instance:_swa_forward_cachedx9 esmc_mlp=te esmc_attn=sdpa(chain_mask) esmc_rope=flash_attn_triton flash_attn=2.8.3.post1 transformer_engine=2.15.0+42b8400 xformers=0.0.35+03b91d7.d20260904",
+  "[esmfold2-opt] LEVER name=fused state=on impl=ef2_server.py origin=kit strategy=F4.autocast_policy mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=tg state=on impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_trunk mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=sg state=on impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_sampler mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=eg state=on impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_trunk mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=ec state=on impl=ef2_opt.py origin=kit strategy=F6.feature_cache mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=fc state=on impl=ef2_opt.py origin=kit strategy=F6.feature_cache mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=pb state=on impl=ef2_opt.py origin=kit strategy=LOCAL.step_invariant_hoist mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=msa state=off impl=ef2_opt.py origin=kit strategy=LOCAL.esmfold2.msa_vendor_fused_trimul mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t1 state=off impl=ef2_w4.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t3 state=on impl=ef2_w4.py origin=kit strategy=LOCAL.esmfold2.tile_table mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t5 state=on impl=ef2_w4.py origin=kit strategy=F4.bf16_weight_precast mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t6 state=on impl=ef2_w4.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t10 state=off impl=ef2_w4.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=mk state=off impl=ef2_mk_sampler.py origin=kit strategy=LOCAL.step_invariant_hoist mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t11 state=off impl=ef2_msa.py origin=kit strategy=F5.fpf_msa_kernels mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t12 state=off impl=ef2_msa.py origin=kit strategy=F5.fpf_msa_kernels mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t13 state=off impl=ef2_msa.py origin=kit strategy=F5.fpf_msa_kernels mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t14 state=off impl=ef2_msa.py origin=kit strategy=LOCAL.layernorm_kernel mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=ls state=on impl=ef2_opt.py origin=kit strategy=LOCAL.esmfold2.loop_static_io mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=rg state=skipped reason=not_for_variant:full_nomsa impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_trunk mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=ax state=on impl=ef2_atom.py origin=kit strategy=LOCAL.step_invariant_hoist mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=af state=off impl=ef2_atom.py origin=kit strategy=LOCAL.esmfold2.atom_block_fused mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=fz state=on impl=ef2_feats.py origin=kit strategy=LOCAL.esmfold2.msa_features_vectorised mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=m15 state=off impl=ef2_msa_v2.py origin=kit strategy=F5.fpf_msa_kernels mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=m16 state=off impl=ef2_msa_v2.py origin=kit strategy=F5.fpf_msa_kernels mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=m17 state=off impl=ef2_msa_v2.py origin=kit strategy=F5.fpf_msa_kernels mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=mh state=skipped reason=not_for_variant:full_nomsa impl=ef2_msa_v2.py origin=kit strategy=LOCAL.step_invariant_hoist mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t15 state=off impl=ef2_pair_v2.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t15msa state=off impl=ef2_pair_v2.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=xtr state=on impl=ef2_pair_v2.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 word=exact provider=opt_core.kernels.transition core=0.5.228.0",
+  "[esmfold2-opt] LEVER name=xte state=on impl=ef2_xte.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 word=exact provider=opt_core.kernels.transition core=0.5.228.0 modules=58",
+  "[esmfold2-opt] LEVER name=t16 state=off impl=ef2_transition_cute.py origin=kit strategy=LOCAL.fused_transition mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=tx state=off impl=ef2_w4.py origin=kit strategy=F2.fpf_trimul_fast mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=trimul state=on impl=ef2_hoist.py origin=kit strategy=LOCAL.esmfold2.msa_trimul_replumb mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=glue state=on impl=ef2_hoist.py origin=kit strategy=LOCAL.esmfold2.msa_trimul_replumb mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 sigmoid_check=ok:65282",
+  "[esmfold2-opt] LEVER name=disto state=on impl=ef2_hoist.py origin=kit strategy=F6.output_overlap mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=xln state=on impl=ef2_xln.py origin=kit strategy=F5.row_layernorm mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 sites=340 floor_rows=4096 core=0.5.228.0 kernels=6 cc=9.0 provider=opt_core.kernels.ln.exactln",
+  "[esmfold2-opt] LEVER name=ro state=on impl=ef2_dit.py origin=kit strategy=F3.cuda_graph_sampler mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 scope=nds1_batch1 kabsch=torch",
+  "[esmfold2-opt] LEVER name=kd state=off impl=ef2_dit.py origin=kit strategy=F6.host_sync_elimination mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=dit state=off impl=ef2_dit.py origin=kit strategy=LOCAL.dit_fused_kernels mode=exact variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=x2b state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=exact variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x3 state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=exact variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x6 state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=exact variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x7 state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=exact variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x8 state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=LOCAL.esmfold2.lean_init mode=exact variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x10 state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=LOCAL.esmfold2.disto_to_host mode=exact variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x4 state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=LOCAL.esmfold2.lm_host_offload mode=exact variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] NOTE pair: the transition provider refuses word=exact for xte (rows=5776, c=256): exact_vouch_below_400_tokens_on_H100:torch2.13.0+cu130/3.7.1 -> the module's own statement serves these calls (by name)",
+  "[esmfold2-opt] NOTE pair: word=exact resolves to the statement (torch_swiglu) for xtr at this size / class -> the module's own statement serves (by name)",
+  "[esmfold2-opt] NOTE pair: the transition provider refuses word=exact for xtr (rows=76, c=128): exact_vouch_below_20_tokens_on_H100:torch2.13.0+cu130/3.7.1 -> the module's own statement serves these calls (by name)",
+  "[esmfold2-opt] NOTE pair: the transition provider refuses word=exact for xtr (rows=5776, c=256): flash_sm90a:init_during_capture -> the module's own statement serves these calls (by name)"
+ ],
+ "env": {
+  "timestamp_utc": "2026-09-26T04:51:23+00:00",
+  "python": "3.12.10",
+  "torch": "2.13.0+cu130",
+  "cuda_runtime": "13.0",
+  "cudnn": 92000,
+  "triton": "3.7.1",
+  "flash_attn": "2.8.3.post1",
+  "transformer_engine": "2.15.0+42b8400",
+  "transformers": "4.57.6",
+  "transformers_source": "https://github.com/huggingface/transformers.git@ef32577f55da19a4989cd7b22e004dc43a4998cb",
+  "esm": "3.3.0",
+  "esm_source": "https://github.com/Biohub/esm.git@26b0bc2b771e3e419ea74f445a5f35cc094a1509",
+  "kits_repo": "https://github.com/anthropics/uplifting-biomolecular-modeling.git",
+  "kits_ref": "f4f62fa6592ae4938d49b1757bea0cfeff9f468e",
+  "sheaf": null,
+  "sheaf_git_sha": "0c4b40eba4769b0ba702f7cca527809dd1ea2ac3",
+  "nvidia_smi": [
+   "NVIDIA H100 80GB HBM3, 580.95.05, 81559 MiB, 1980 MHz, 700.00 W"
+  ],
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "gpu_mem_mib": 81079,
+  "compute_capability": "9.0",
+  "esmfold2_opt": "0.3.27"
+ },
+ "config": {
+  "lengths": [
+   128,
+   256,
+   512,
+   768
+  ],
+  "num_loops": 20,
+  "num_sampling_steps": 200,
+  "iters": 3,
+  "warmup": 1,
+  "seed": 0
+ },
+ "cells": [
+  {
+   "length": 128,
+   "predict_s_p50": 1.107120211999984,
+   "predict_s_p95": 1.2204580885999832,
+   "predict_s_all": [
+    1.233051185999983,
+    1.107120211999984,
+    1.1063057719999847
+   ],
+   "peak_alloc_mib": 14621.08203125,
+   "peak_reserved_mib": 15156.0,
+   "status": "ok"
+  },
+  {
+   "length": 256,
+   "predict_s_p50": 2.150538890000007,
+   "predict_s_p95": 2.235792234199991,
+   "predict_s_all": [
+    2.245264827999989,
+    2.1500558630000057,
+    2.150538890000007
+   ],
+   "peak_alloc_mib": 15897.77587890625,
+   "peak_reserved_mib": 17150.0,
+   "status": "ok"
+  },
+  {
+   "length": 512,
+   "predict_s_p50": 5.327855270000043,
+   "predict_s_p95": 5.540282486900026,
+   "predict_s_all": [
+    5.563885511000024,
+    5.322959093000009,
+    5.327855270000043
+   ],
+   "peak_alloc_mib": 20227.28466796875,
+   "peak_reserved_mib": 23552.0,
+   "status": "ok"
+  },
+  {
+   "length": 768,
+   "predict_s_p50": 11.033423361000018,
+   "predict_s_p95": 11.099994619499995,
+   "predict_s_all": [
+    11.107391425999992,
+    11.008767756999987,
+    11.033423361000018
+   ],
+   "peak_alloc_mib": 26798.27294921875,
+   "peak_reserved_mib": 33016.0,
+   "status": "ok"
+  }
+ ]
+}

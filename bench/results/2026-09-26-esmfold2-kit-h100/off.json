@@ -1,0 +1,98 @@
+{
+ "mode": "off",
+ "model": "biohub/ESMFold2",
+ "load_s": 32.638335179,
+ "kit_lines": [],
+ "env": {
+  "timestamp_utc": "2026-09-26T04:48:54+00:00",
+  "python": "3.12.10",
+  "torch": "2.13.0+cu130",
+  "cuda_runtime": "13.0",
+  "cudnn": 92000,
+  "triton": "3.7.1",
+  "flash_attn": "2.8.3.post1",
+  "transformer_engine": "2.15.0+42b8400",
+  "transformers": "4.57.6",
+  "transformers_source": "https://github.com/huggingface/transformers.git@ef32577f55da19a4989cd7b22e004dc43a4998cb",
+  "esm": "3.3.0",
+  "esm_source": "https://github.com/Biohub/esm.git@26b0bc2b771e3e419ea74f445a5f35cc094a1509",
+  "kits_repo": "https://github.com/anthropics/uplifting-biomolecular-modeling.git",
+  "kits_ref": "f4f62fa6592ae4938d49b1757bea0cfeff9f468e",
+  "sheaf": null,
+  "sheaf_git_sha": "0c4b40eba4769b0ba702f7cca527809dd1ea2ac3",
+  "nvidia_smi": [
+   "NVIDIA H100 80GB HBM3, 580.95.05, 81559 MiB, 1980 MHz, 700.00 W"
+  ],
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "gpu_mem_mib": 81079,
+  "compute_capability": "9.0",
+  "esmfold2_opt": "0.3.27"
+ },
+ "config": {
+  "lengths": [
+   128,
+   256,
+   512,
+   768
+  ],
+  "num_loops": 20,
+  "num_sampling_steps": 200,
+  "iters": 3,
+  "warmup": 1,
+  "seed": 0
+ },
+ "cells": [
+  {
+   "length": 128,
+   "predict_s_p50": 2.828813156999999,
+   "predict_s_p95": 2.8386600902999946,
+   "predict_s_all": [
+    2.839754193999994,
+    2.828813156999999,
+    2.823467458000003
+   ],
+   "peak_alloc_mib": 13617.150390625,
+   "peak_reserved_mib": 13838.0,
+   "status": "ok"
+  },
+  {
+   "length": 256,
+   "predict_s_p50": 3.4791654019999925,
+   "predict_s_p95": 3.4818951523999986,
+   "predict_s_all": [
+    3.482198457999999,
+    3.4791654019999925,
+    3.445847017999995
+   ],
+   "peak_alloc_mib": 14377.93701171875,
+   "peak_reserved_mib": 14964.0,
+   "status": "ok"
+  },
+  {
+   "length": 512,
+   "predict_s_p50": 8.752586605999994,
+   "predict_s_p95": 8.775415235599999,
+   "predict_s_all": [
+    8.74567420400001,
+    8.752586605999994,
+    8.77795175
+   ],
+   "peak_alloc_mib": 17652.9404296875,
+   "peak_reserved_mib": 19256.0,
+   "status": "ok"
+  },
+  {
+   "length": 768,
+   "predict_s_p50": 18.878007376000014,
+   "predict_s_p95": 18.8843826511,
+   "predict_s_all": [
+    18.878007376000014,
+    18.84586454699999,
+    18.885091015
+   ],
+   "peak_alloc_mib": 23108.96044921875,
+   "peak_reserved_mib": 28536.0,
+   "status": "ok"
+  }
+ ]
+}
