@@ -1,0 +1,149 @@
+{
+ "mode": "fast",
+ "model": "biohub/ESMFold2",
+ "load_s": 76.73746792700001,
+ "kit_lines": [
+  "[esmfold2-opt] WEIGHTS pinned sha256: 14 file(s) for variant full_nomsa (config.json=c5566fab6a17, model-00001-of-00006.safetensors=bd90149ff223, model-00002-of-00006.safetensors=f75e2144d826, model-00003-of-00006.safetensors=f699f01ecc96, +10 more); 14 (cached digest 2026-09-25T06:01:18Z)",
+  "[esmfold2-opt] ACTIVE mode=fast variant=full_nomsa server_mode=opt14_msa esm=3.3.0 transformers=4.57.6 gpu=NVIDIA H100 80GB HBM3(sm90) n_gpu=1 sharding=none levers=fused,t3,t5,tx,ax,af,fz,tg,sg,eg,ec,fc,pb,msa,ls,m15,m16,m17,t16,xln,ro,kd,dit,x2b,x3,x6,x7,x8,x10 fallbacks=none applied=deferred atom_attn=flash_attn esmc_mlp=te esmc_attn=sdpa(chain_mask) esmc_rope=flash_attn_triton flash_attn=2.8.3.post1 transformer_engine=2.15.0+42b8400 xformers=0.0.35+03b91d7.d20260904 compile=n/a graph_lru_sampler=2 graph_budgets=800/800/1536",
+  "[esmfold2-opt] APPLIED model#0 msa_encoder mode=fast variant=full_nomsa server_mode=opt14_msa levers=fused,t3,t5,tx,ax,af,fz,tg,sg,eg,ec,fc,pb,msa,ls,m15,m16,m17,t16,xln,ro,kd,dit,x2b,x3,x6,x7,x8,x10 fallbacks=none substituted=none not_for_variant=rg,mh not_for_class=t10,t15,t15msa atom_attn=flash_attn atom_forward=instance:_swa_forward_cachedx9 esmc_mlp=te esmc_attn=sdpa(chain_mask) esmc_rope=flash_attn_triton flash_attn=2.8.3.post1 transformer_engine=2.15.0+42b8400 xformers=0.0.35+03b91d7.d20260904",
+  "[esmfold2-opt] LEVER name=fused state=on impl=ef2_server.py origin=kit strategy=F4.autocast_policy mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=tg state=on impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_trunk mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=sg state=on impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_sampler mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=eg state=on impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_trunk mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=ec state=on impl=ef2_opt.py origin=kit strategy=F6.feature_cache mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=fc state=on impl=ef2_opt.py origin=kit strategy=F6.feature_cache mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=pb state=on impl=ef2_opt.py origin=kit strategy=LOCAL.step_invariant_hoist mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=msa state=on impl=ef2_opt.py origin=kit strategy=LOCAL.esmfold2.msa_vendor_fused_trimul mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t1 state=off impl=ef2_w4.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t3 state=on impl=ef2_w4.py origin=kit strategy=LOCAL.esmfold2.tile_table mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t5 state=on impl=ef2_w4.py origin=kit strategy=F4.bf16_weight_precast mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t6 state=off impl=ef2_w4.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t10 state=skipped reason=not_for_class:sm90:superseded_by_t16 impl=ef2_w4.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=mk state=off impl=ef2_mk_sampler.py origin=kit strategy=LOCAL.step_invariant_hoist mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t11 state=off impl=ef2_msa.py origin=kit strategy=F5.fpf_msa_kernels mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t12 state=off impl=ef2_msa.py origin=kit strategy=F5.fpf_msa_kernels mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t13 state=off impl=ef2_msa.py origin=kit strategy=F5.fpf_msa_kernels mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t14 state=off impl=ef2_msa.py origin=kit strategy=LOCAL.layernorm_kernel mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=ls state=on impl=ef2_opt.py origin=kit strategy=LOCAL.esmfold2.loop_static_io mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=rg state=skipped reason=not_for_variant:full_nomsa impl=ef2_opt.py origin=kit strategy=F3.cuda_graph_trunk mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=ax state=on impl=ef2_atom.py origin=kit strategy=LOCAL.step_invariant_hoist mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=af state=on impl=ef2_atom.py origin=kit strategy=LOCAL.esmfold2.atom_block_fused mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 gemm=bf16",
+  "[esmfold2-opt] LEVER name=fz state=on impl=ef2_feats.py origin=kit strategy=LOCAL.esmfold2.msa_features_vectorised mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=m15 state=on impl=ef2_msa_v2.py origin=kit strategy=F5.fpf_msa_kernels mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=m16 state=on impl=ef2_msa_v2.py origin=kit strategy=F5.fpf_msa_kernels mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=m17 state=on impl=ef2_msa_v2.py origin=kit strategy=F5.fpf_msa_kernels mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=mh state=skipped reason=not_for_variant:full_nomsa impl=ef2_msa_v2.py origin=kit strategy=LOCAL.step_invariant_hoist mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t15 state=skipped reason=not_for_class:sm90:superseded_by_t16 impl=ef2_pair_v2.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t15msa state=skipped reason=not_for_class:sm90:superseded_by_t16 impl=ef2_pair_v2.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=xtr state=off impl=ef2_pair_v2.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=xte state=off impl=ef2_xte.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=t16 state=on impl=ef2_transition_cute.py origin=kit strategy=LOCAL.fused_transition mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 word=fast provider=opt_core.kernels.transition core=0.5.228.0 family=esmpair+esmfused",
+  "[esmfold2-opt] LEVER name=tx state=on impl=ef2_w4.py origin=kit strategy=F2.fpf_trimul_fast mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 word=fast row=tx_sm90a cell=9.0|bf16|C256|H256|N<=256|in|fwd stack=H100:2.13.0+cu130/3.7.1/nocueq abi=torch2.13.0+cu130-cpython-312-x86_64-linux-gnu-sm90 cc=9.0 refused=none stock_classes=0",
+  "[esmfold2-opt] LEVER name=trimul state=off impl=ef2_hoist.py origin=kit strategy=LOCAL.esmfold2.msa_trimul_replumb mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=glue state=off impl=ef2_hoist.py origin=kit strategy=LOCAL.esmfold2.msa_trimul_replumb mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=disto state=off reason=dropped_by_line:fast impl=ef2_hoist.py origin=kit strategy=F6.output_overlap mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90",
+  "[esmfold2-opt] LEVER name=xln state=on impl=ef2_xln.py origin=kit strategy=F5.row_layernorm mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 sites=340 floor_rows=4096 core=0.5.228.0 kernels=6 cc=9.0 provider=opt_core.kernels.ln.exactln",
+  "[esmfold2-opt] LEVER name=ro state=on impl=ef2_dit.py origin=kit strategy=F3.cuda_graph_sampler mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 scope=nds1_batch1 kabsch=device",
+  "[esmfold2-opt] LEVER name=kd state=on impl=ef2_dit.py origin=kit strategy=F6.host_sync_elimination mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 scope=ndsN_batchN",
+  "[esmfold2-opt] LEVER name=dit state=on impl=ef2_dit.py origin=kit strategy=LOCAL.dit_fused_kernels mode=fast variant=full_nomsa model=0 tier_vs_stock=T2 sm=sm90 scope=ndsN_batchN gemm=bf16 cond=bf16 attn=flash attn_precision=bf16",
+  "[esmfold2-opt] LEVER name=x2b state=on impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=fast variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x3 state=on impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=fast variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x6 state=on impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=fast variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x7 state=on impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=F7.chunked_eval mode=fast variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x8 state=on impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=LOCAL.esmfold2.lean_init mode=fast variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x10 state=on impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=LOCAL.esmfold2.disto_to_host mode=fast variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90",
+  "[esmfold2-opt] LEVER name=x4 state=off impl=../EF2_XL_ADDON_v1/ef2_xl.py origin=kit strategy=LOCAL.esmfold2.lm_host_offload mode=fast variant=full_nomsa model=0 tier_vs_stock=bitwise sm=sm90"
+ ],
+ "env": {
+  "timestamp_utc": "2026-09-26T04:53:44+00:00",
+  "python": "3.12.10",
+  "torch": "2.13.0+cu130",
+  "cuda_runtime": "13.0",
+  "cudnn": 92000,
+  "triton": "3.7.1",
+  "flash_attn": "2.8.3.post1",
+  "transformer_engine": "2.15.0+42b8400",
+  "transformers": "4.57.6",
+  "transformers_source": "https://github.com/huggingface/transformers.git@ef32577f55da19a4989cd7b22e004dc43a4998cb",
+  "esm": "3.3.0",
+  "esm_source": "https://github.com/Biohub/esm.git@26b0bc2b771e3e419ea74f445a5f35cc094a1509",
+  "kits_repo": "https://github.com/anthropics/uplifting-biomolecular-modeling.git",
+  "kits_ref": "f4f62fa6592ae4938d49b1757bea0cfeff9f468e",
+  "sheaf": null,
+  "sheaf_git_sha": "0c4b40eba4769b0ba702f7cca527809dd1ea2ac3",
+  "nvidia_smi": [
+   "NVIDIA H100 80GB HBM3, 580.95.05, 81559 MiB, 1980 MHz, 700.00 W"
+  ],
+  "gpu": "NVIDIA H100 80GB HBM3",
+  "gpu_mem_mib": 81079,
+  "compute_capability": "9.0",
+  "esmfold2_opt": "0.3.27"
+ },
+ "config": {
+  "lengths": [
+   128,
+   256,
+   512,
+   768
+  ],
+  "num_loops": 20,
+  "num_sampling_steps": 200,
+  "iters": 3,
+  "warmup": 1,
+  "seed": 0
+ },
+ "cells": [
+  {
+   "length": 128,
+   "predict_s_p50": 0.3644786059999774,
+   "predict_s_p95": 0.6078157774999737,
+   "predict_s_all": [
+    0.6348532409999734,
+    0.3644786059999774,
+    0.3642357979999815
+   ],
+   "peak_alloc_mib": 15597.4833984375,
+   "peak_reserved_mib": 16104.0,
+   "status": "ok"
+  },
+  {
+   "length": 256,
+   "predict_s_p50": 0.9218540859999962,
+   "predict_s_p95": 1.0046473701999958,
+   "predict_s_all": [
+    1.0138466239999957,
+    0.9218540859999962,
+    0.9216451239999515
+   ],
+   "peak_alloc_mib": 16827.64794921875,
+   "peak_reserved_mib": 17624.0,
+   "status": "ok"
+  },
+  {
+   "length": 512,
+   "predict_s_p50": 2.95632728999999,
+   "predict_s_p95": 3.0556611576000137,
+   "predict_s_all": [
+    3.0666982540000163,
+    2.9541707739999765,
+    2.95632728999999
+   ],
+   "peak_alloc_mib": 20820.27587890625,
+   "peak_reserved_mib": 23984.0,
+   "status": "ok"
+  },
+  {
+   "length": 768,
+   "predict_s_p50": 6.463694085999975,
+   "predict_s_p95": 6.56076131529997,
+   "predict_s_all": [
+    6.57154656299997,
+    6.463694085999975,
+    6.436045249000017
+   ],
+   "peak_alloc_mib": 25519.5244140625,
+   "peak_reserved_mib": 30568.0,
+   "status": "ok"
+  }
+ ]
+}
